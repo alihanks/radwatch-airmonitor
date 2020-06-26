@@ -1,0 +1,12 @@
+#open fdisk for working
+sudo fdisk /dev/sdX
+> p #print partition table
+> n #make new partition
+#make filesystem on partition p
+sudo mkfs.ext4 /dev/sdXp 
+#get uuid
+ls -lah /dev/disk/by-uuid
+#edit fstab
+sudo emacs -nw /etc/fstab
+#mount the sucker
+sudo mount /dev/sdXp

@@ -1,0 +1,1 @@
+env - `cat tmp.txt` /bin/sh

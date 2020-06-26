@@ -1,0 +1,517 @@
+
+
+<!DOCTYPE html>
+<html>
+<head>
+    <meta name="viewport" content="initial-scale=1.0, user-scalable=no">
+    <meta charset="utf-8">
+<title>Clean Tech Map</title>
+<link href="./src/nv.d3.css" rel="stylesheet" type="text/css">
+	<script src="http://code.jquery.com/jquery-1.8.2.js"></script>
+	<script src="http://code.jquery.com/ui/1.9.0/jquery-ui.js"></script>
+	<link href="./examples/jquery-ui.css" rel="stylesheet" type="text/css"/>
+<script type="text/javascript" src="https://maps.googleapis.com/maps/api/js?key=AIzaSyBdgANTsWcDfJycmgJ3z_EBqmNZU3GWfDI&sensor=false&language=en"></script>
+
+<script src="./examples/clean.json"></script>
+
+    <script>
+
+function redraw_map()
+{
+	for(i=0;i<patent.length;i++)
+		if(
+				aatype[patent[i].atype-1] &&
+				cctype[patent[i].ctype-1] &&
+				patent[i].grantyear>=year_min &&
+				patent[i].grantyear<=year_max
+		)
+			markersArray[i].setVisible(true);
+		else
+			markersArray[i].setVisible(false);
+}
+
+		mileage=400;
+		year_min=2006;
+		year_max=2009;
+		aatype=[true,true,true,true,true,true];
+		cctype=[true,true,true,true,true,true];
+
+		hub={Houston:[29.09024, -95.712891],SF:[37.05024, -122.2432891],Boston:[42.09024, -71.712891],Chicago:[41.09024, -87.712891]};
+
+		markersArray = [];
+
+		aaatype=['lone inventor','venture backed firms','small & medium firms','academic','governmental','large firms'];
+
+		ctype=['solar power','wind power','biofuel','geothermal','hydroelectricity','nuclear'];
+		ctypeb=['solar','wind','biofuel','geo','hydro','nuclear'];
+		ctype_color=['#FFCC00','#33CCFF','#006600','#808080','#000099','#999966'];
+
+      // Create an object containing LatLng, population.
+      var citymap = {};
+      citymap['chicago'] = {
+        center: new google.maps.LatLng(41.878113, -87.629798),
+        population: 2842518
+      };
+      citymap['newyork'] = {
+        center: new google.maps.LatLng(40.714352, -74.005973),
+        population: 8143197
+      };
+      citymap['losangeles'] = {
+        center: new google.maps.LatLng(34.052234, -118.243684),
+        population: 3844829
+      }
+      var cityCircle;
+
+      function initialize() {
+        var mapOptions = {
+          zoom: 5,
+          center: new google.maps.LatLng(38.09024, -102.712891),
+          mapTypeId: google.maps.MapTypeId.TERRAIN
+        };
+
+			var map = new google.maps.Map(document.getElementById('mapcanvas'),mapOptions);
+
+          var circleOptions = {
+            strokeColor: '#FF0000',
+            strokeOpacity: 0.77,
+            strokeWeight: 2,
+            fillColor: '#FF0000',
+            fillOpacity: 0.24,
+            map: map,
+            center: new google.maps.LatLng(37.052234, -122.243684),
+            radius: mileage*1000
+          };
+          circle = new google.maps.Circle(circleOptions);
+
+			//circle.setEditable(true);
+
+			//for(i=100;i<patent.length && i<25530;i+=20)
+			for(i=0;i<patent.length;i++)
+			{
+        		var marker = new google.maps.Marker({
+	            position: new google.maps.LatLng(patent[i].lat,patent[i].lng),
+   	         map: map,
+					//animation: google.maps.Animation.DROP,
+					icon: 'icon_'+ctypeb[patent[i].ctype-1]+'.png',
+					html: '<div class="info"><span class="infoblack">'+patent[i].title+"</span>"
+									+' (energy type: <span class="infored">'+ctype[patent[i].ctype-1]+'</span>)'
+									+'<br><br><span class="infoblack">'+patent[i].inventors+'</span><br>'
+									+'<span class="infoblack">'+patent[i].assignee+'</span>'
+									+' (assignee type: <span class="infoblue">'+patent[i].aatype+'</span>)'
+									+'<br><br><span class="infogray">Grant Date</span>: '+patent[i].grantdate+'. <span class="infogray">Application Date</span>: '+patent[i].appdate
+									+'.<br><span class="infogray">Patent number</span>: '+patent[i].patno+'. <span class="infogray">Application number</span>: '+patent[i].appno
+									+'.<br><span class="infogray">US class</span>: '+patent[i].classus+'. <span class="infogray">International class</span>: '+patent[i].classintl
+									+'.<br><br>'+patent[i].abstract
++'<br><br>Read more: <u>Patent Diffusion to Public Media (New York Times)</u>'
++'<br><br>Read more: <u>Patent Diffusion to Science Funding Space (National Science Foundation Awards)</u>'
++'<br><br>Read original patent: <u>Patent page on United States Patent and Trademark Office</u>'
+									+'</div>',
+	            title: patent[i].patno+'\n\n'+patent[i].inventors+'\n\n'+patent[i].assignee+'\n\n'+patent[i].title+'\n\n'+patent[i].abstract
+
+	         });
+				markersArray.push(marker);
+				infowindow = new google.maps.InfoWindow({content: "holding..."});
+				google.maps.event.addListener(marker, 'click', function () {
+					infowindow.setContent(this.html);
+					infowindow.open(map,this);
+				});
+
+				markersArray[i].setVisible(false);
+
+			}
+				redraw_map();
+				markersArray[20000].setVisible(true);
+				//markersArray[20300].setVisible(true);
+      }
+
+
+    </script>
+
+
+<style>
+.info{
+	font-family: sans-serif;
+	font-size: 10px;
+}
+.infogray{
+	font-weight:700;
+	color: #8B008B;
+}
+.infoblack{
+	font-weight:900;
+	color: black;
+}
+.infoblue{
+	font-weight:900;
+	color: blue;
+}
+.infored{
+	font-weight:900;
+	color: red;
+}
+
+body {
+  overflow-y:scroll;
+  //overflow-y:visible;
+	margin:0px; padding:0px; border:0px;
+}
+
+text {
+  font: 12px sans-serif;
+}
+
+#chart1 {
+//	position:absolute;
+  height: 240px;
+//	width: 600px,
+//  margin: 10px;
+/*
+  Minimum height and width is a good idea to prevent negative SVG dimensions...
+  For example width should be =< margin.left + margin.right + 1,
+  of course 1 pixel for the entire chart would not be very useful, BUT should not have errors
+*/
+}
+
+</style>
+
+
+	<style type="text/css">
+		#slider { margin: 15px;}
+		#slider-year { margin: 11px;}
+	</style>
+
+</head>
+
+<body onload="initialize()">
+
+
+
+
+
+
+
+
+
+
+<div id="draggable" class="ui-widget-content" style="position:absolute; 
+top:40px; right:40px; z-index:2000; width:300px; height:480px; padding:10px;
+font-size:10px; font-family:sans-serif;
+border:3px solid;
+background-color:rgba(255,255,255,0.86);
+">
+<form>
+<div style="font-size:12px; text-align:center;">
+<b>The Distribution of Clean Tech Patents</b>
+</div>
+<hr>
+<div style="margin-left:5px;">
+<b>Assignee Type</b><br>
+<!-- 'lone inventor','venture backed firms','small & medium firms','academic','governmental','large firms' -->
+<input type="checkbox" name="vehicle" checked="yes" onchange='aatype[0]=!aatype[0];redraw_map();redraw_bar();'>lone inventor
+<input type="checkbox" name="vehicle" checked="yes" onchange='aatype[1]=!aatype[1];redraw_map();redraw_bar();'>venture backed firms<br>
+<input type="checkbox" name="vehicle" checked="yes" onchange='aatype[2]=!aatype[2];redraw_map();redraw_bar();'>small &amp; medium firms
+<input type="checkbox" name="vehicle" checked="yes" onchange='aatype[3]=!aatype[3];redraw_map();redraw_bar();'>academic<br>
+<input type="checkbox" name="vehicle" checked="yes" onchange='aatype[4]=!aatype[4];redraw_map();redraw_bar();'>governmental
+<input type="checkbox" name="vehicle" checked="yes" onchange='aatype[5]=!aatype[5];redraw_map();redraw_bar();'>large firms
+</div>
+<hr>
+<!--
+<div style="margin-left:5px;">
+<b>Clean Type</b><br>
+<input type="checkbox" name="vehicle" checked="yes" value="Bike"><img src="./icon_solar.png">solar power
+<input type="checkbox" name="vehicle" checked="yes" value="Bike"><img src="./icon_wind.png">wind power<br>
+<input type="checkbox" name="vehicle" checked="yes" value="Bike"><img src="./icon_biofuel.png">biofuel
+<input type="checkbox" name="vehicle" checked="yes" value="Bike"><img src="./icon_geo.png">geothermal<br>
+<input type="checkbox" name="vehicle" checked="yes" value="Bike"><img src="./icon_hydro.png">hydroelectricity
+<input type="checkbox" name="vehicle" checked="yes" value="Bike"><img src="./icon_nuclear.png">nuclear
+</div>
+<br>
+<hr>
+-->
+
+</form>
+
+
+
+<div>
+<div style="font-size:12px; text-align:center;">
+<!--
+from the center of San Francisco, CA: <span id="mileage"><script>document.write(mileage);</script></span> miles
+-->
+from the center of <select id="stateid" onchange="refresh_state();redraw_bar();">
+				<option value="SF">San Francisco</option>
+				<option value="Boston">Boston</option>
+				<option value="Chicago">Chicago</option>
+				<option value="Houston">Houston</option>
+				<option value="unspecified">unspecified</option>
+			</select>: <span id="mileage"><font color="blue"><b><script>document.write(mileage);</script></b></font></span> km
+</div>
+	<div id="slider"></div>
+
+			<div style="position:relative; font-size:10px; font-family:sans-serif; margin-left:16px; top:-15px;">
+				<span style="display:inline-block;width: 18px;text-align:left;margin-right: 18px;">|<br />0</span>
+				<span style="display:inline-block;width: 18px;text-align:center;margin-right: 27px;">|<br />1000</span>
+				<span style="display:inline-block;width: 18px;text-align:center;margin-right: 27px;">|<br />2000</span>
+				<span style="display:inline-block;width: 18px;text-align:center;margin-right: 27px;">|<br />3000</span>
+				<span style="display:inline-block;width: 18px;text-align:center;margin-right: 27px;">|<br />4000</span>
+				<span style="display:inline-block;width: 18px;text-align:right;">|<br />5000</span>
+			</div>
+</div>
+<hr>
+<div>
+
+<div style="font-size:10px; text-align:center;">
+Patent grant year: <span id="yearapp"><script>document.write("<font color=\"blue\"><b>"+year_min+' - '+year_max+"</b></font>");</script></span>
+<br>
+</div>
+	<div id="slider-year"></div>
+
+			<div style="position:relative; font-size:10px; font-family:sans-serif; margin-left:11px; top:-12px;">
+				<span style="display:inline-block;width: 12px;text-align:left;margin-right: 60px;">|<br />1975</span>
+				<span style="display:inline-block;width: 202px;text-align:right;">|<br />2012</span>
+			</div>
+</div>
+<hr>
+
+<div style="font-size:10px; font-family:tahoma; text-align:center; color:red;">
+<!--
+Ken Younge, Ramana Nanda<br>
+Guan-Cheng Li, Lee Fleming<br><br>
+-->
+Guan-Cheng Li & Lee Fleming<br><br>
+This work is supported by the National Science Foundation under Grant Number 1064182<br>
+and the United States Patent and Trademark Office.
+<!--
+Fung Institute for Engineering Leadership<br>
+University of California, Berkeley<br>
+Copyrighted. All rights reserved. 2013.
+-->
+<img src='./fung2013.png'>
+</div>
+
+</div>
+
+
+
+
+
+<div style="margin:0px; padding:0px; border:0px">
+	<div id="mapcanvas" style="height:580px; margin:0px; padding:0px; border:0px">
+	</div>
+  <div id="chart1">
+    <svg></svg>
+  </div>
+</div>
+
+<script src="./lib/d3.v2.js"></script>
+<script src="./nv.d3.js"></script>
+<script src="./src/tooltip.js"></script>
+<script src="./src/utils.js"></script>
+<script src="./src/models/legend.js"></script>
+<script src="./src/models/axis.js"></script>
+<script src="./src/models/multiBar.js"></script>
+<script src="./src/models/multiBarChart.js"></script>
+<script src="./examples/stream_layers.js"></script>
+
+<script>
+/*
+		if(
+				aatype[patent[i].atype-1] &&
+				cctype[patent[i].ctype-1] &&
+				patent[i].grantyear>=year_min &&
+				patent[i].grantyear<=year_max
+		)
+*/
+
+function distance(lat1,lon1,lat2,lon2) {
+	var R = 6371; // km (change this constant to get miles)
+	var dLat = (lat2-lat1) * Math.PI / 180;
+	var dLon = (lon2-lon1) * Math.PI / 180;
+	var a = Math.sin(dLat/2) * Math.sin(dLat/2) +
+		Math.cos(lat1 * Math.PI / 180 ) * Math.cos(lat2 * Math.PI / 180 ) *
+		Math.sin(dLon/2) * Math.sin(dLon/2);
+	var c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+	var d = R * c;
+	return d;
+}
+
+function redraw_bar()
+{
+/*
+	for(ii=0;ii<cctype.length;ii++)
+		cctype[ii]=true;
+	redraw_map();
+
+	if($("#stateid").val()=="Houston")
+	{
+		circle.setVisible(true);
+		circle.setCenter(new google.maps.LatLng(hub.Houston[0],hub.Houston[1]));
+	}
+	if($("#stateid").val()=="unspecified")
+		circle.setVisible(false);
+
+*/
+
+	//hub={Houston:[29.09024, -95.712891],SF:[37.05024, -122.2432891],Boston:[42.09024, -71.712891],Chicago:[41.09024, -87.712891]};
+
+	aaatype_count_all=new Array();
+	for(j=0;j<cctype.length;j++)
+	{
+		aaatype_count=[];
+
+		if($("#stateid").val()=="unspecified")
+		{
+			mileagex=9999999999999;
+			centerx=0;
+			centery=0;
+		}
+		else
+		{
+			mileagex=mileage;
+			centery=eval("hub."+$("#stateid").val()+"[0]");
+			centerx=eval("hub."+$("#stateid").val()+"[1]");
+		}
+
+//alert(centery+" "+centerx+" "+mileagex);
+
+		for(i=0;i<aaatype.length;i++)
+			aaatype_count.push(0);
+		for(i=0;i<patent.length;i++)
+			if(patent[i].ctype-1==j)
+			if(cctype[patent[i].ctype-1])
+			if(aatype[patent[i].atype-1])
+			if(patent[i].grantyear>=year_min)
+			if(patent[i].grantyear<=year_max)
+			if(distance(centery,centerx,patent[i].lat,patent[i].lng)<mileagex)
+				//aaatype_count[aaatype.indexOf(patent[i].aatype)]++;
+				//aaatype_count[aaatype_offset.indexOf(patent[i].atype-1)]++;
+				aaatype_count[patent[i].atype-1]++;
+		aaatype_count_all.push(aaatype_count);
+	}
+
+	dataa=[];
+	for(i=0;i<aaatype_count_all.length;i++)
+	{
+		var obj={key:"",color:"",values:[],disabled:!cctype[i]};
+		obj.key=ctype[i];
+		obj.color=ctype_color[i];
+		for(j=0;j<aaatype.length;j++)
+		{
+			var xy={x:"",y:0};
+			xy.x=aaatype[j];
+			xy.y=aaatype_count_all[i][j];
+			obj.values.push(xy);
+		}
+		dataa.push(obj);
+	}
+
+	var chart;
+	nv.addGraph(function() {
+		chart = nv.models.multiBarChart().margin({});
+
+		chart.yAxis.tickFormat(d3.format(',.0f'));
+		d3.select('#chart1 svg')
+			.datum(dataa)
+			.transition().duration(500).call(chart);
+		nv.utils.windowResize(chart.update);
+		chart.dispatch.on('stateChange', function(e) { nv.log('New State:', JSON.stringify(e)); });
+		return chart;
+	});
+}
+
+redraw_bar();
+
+</script>
+
+
+
+
+
+
+
+<script>
+
+
+	$(function() {
+		$( "#draggable" ).draggable();
+	});
+	$(function() {
+		$( "#draggable-slider" ).draggable();
+	});
+	$(function() {
+		$( "#draggable-slider-year" ).draggable();
+	});
+
+	$(document).ready(function() {
+		$("#slider").slider({
+			range: "min",
+			value: mileage,
+			min: 0,
+			max: 5400,
+			step: 1,
+			slide: function( event, ui ) {
+				//$("#mileage").val( ui.value );
+				$("#mileage").text( ui.value );
+				mileage=ui.value;
+circle.setRadius(mileage*1000);
+				//alert( ui.value);
+				redraw_bar();
+
+
+			}
+		});
+		$("#slider-year").slider({
+			range: true,
+			values: [year_min,year_max],
+			min: 1975,
+			max: 2012,
+			step: 1,
+			slide: function( event, ui ) {
+				//$("#mileage").val( ui.value );
+				$("#yearapp").text( ui.values[ 0 ] + " - " + ui.values[ 1 ] );
+				year_min=ui.values[0];
+				year_max=ui.values[1];
+				redraw_map();
+				redraw_bar();
+			}
+		});
+
+//  $( "#year-app" ).text($( "#slider-year" ).slider( "values", 0 ) + $( "#slider-year" ).slider( "values", 1 ) );
+
+	});
+
+
+
+function refresh_state() {
+	if($("#stateid").val()=="SF")
+	{
+		circle.setVisible(true);
+		circle.setCenter(new google.maps.LatLng(hub.SF[0],hub.SF[1]));
+	}
+	if($("#stateid").val()=="Boston")
+	{
+		circle.setVisible(true);
+		//circle.setCenter(new google.maps.LatLng(42.09024, -71.712891));
+		circle.setCenter(new google.maps.LatLng(hub.Boston[0],hub.Boston[1]));
+	}
+	if($("#stateid").val()=="Chicago")
+	{
+		circle.setVisible(true);
+		circle.setCenter(new google.maps.LatLng(hub.Chicago[0],hub.Chicago[1]));
+	}
+	if($("#stateid").val()=="Houston")
+	{
+		circle.setVisible(true);
+		circle.setCenter(new google.maps.LatLng(hub.Houston[0],hub.Houston[1]));
+	}
+	if($("#stateid").val()=="unspecified")
+		circle.setVisible(false);
+}
+
+
+
+</script>
+
+  </body>
+</html>
+

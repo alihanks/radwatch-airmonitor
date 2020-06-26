@@ -1,0 +1,2 @@
+#set the sticky bit on the group (subsequent files get set with this group)
+chmod g+s dir //setted the gid

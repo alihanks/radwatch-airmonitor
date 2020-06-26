@@ -1,0 +1,31 @@
+<?xml version="1.0"?>
+<xml>
+  <data_description>
+    <data>
+      <year>
+	<array name="timestamps">
+	  <col name="utc-gm-time">UTC-sec</col>
+	</array>
+	<array name="spectra">
+	  <col name="spectra-channels" axis_projection="Channels">0</col>
+	  <row name="time-binned-spectra" axis_projection="Spectra">0</row>
+	</array>
+	<array name="weather_data">
+	  <col name="Temperature" units="Celcius">0</col>
+	  <col name="Barometric-Pressure" units="kPa">1</col>
+	  <col name="Solar" units="W/m2">2</col>
+	  <col name="Relative-Hum" units="%">3</col>
+	  <col name="Wind-Direction" units="Deg">4</col>
+	  <col name="Wind-Speed" units="m/sec">5</col>
+	  <col name="Differential Rain" units="mm">6</col>
+	</array>
+	<array name="spectra_meta">
+	  <col name="Real-Time" units="sec">0</col>
+	  <col name="Live-Time" units="sec">1</col>
+	  <col name="Spectra-Bin-Cal-Const" units="keV">2</col>
+	  <col name="Spectra-Bin-Cal-Lin" units="keV/bin">3</col>
+	</array>
+      </year>
+    </data>
+  </data_description>
+<xml>

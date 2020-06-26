@@ -1,0 +1,12 @@
+_____________________________________
+Dropbox information
+
+The dropbox install is aliased as db in the prompt.
+To check status
+   db status
+To start 
+   db start -i
+To checkfilestatus
+   db filestatus [PATH]
+
+_____________________________________

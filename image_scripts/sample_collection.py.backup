@@ -1,0 +1,273 @@
+import numpy as np;
+import h5py
+import datetime;
+
+import glob;
+import os;
+import sys;
+sys.path.insert(0,"..");
+from time_utils import *;     
+import spectra_utils;
+import weather_utils;
+import calendar;
+from itertools import chain;
+
+class ROI:
+    def __init__(self,roi_peak,roi_bkg):
+        self.peak=roi_peak;
+        self.bkg=roi_bkg;
+        self.isotope='';
+        self.origin='';
+        self.counts=[];
+        self.energy=[];
+        self.errors=[];
+    def get_counts(self,spec):
+        sum_=0;k=0;
+        for el in spec[self.peak[0]:self.peak[1]]:
+            sum_+=el;
+            k+=1;
+        bkg_sum_=0;l=0;
+        for bkg_el in self.bkg:
+            for p in spec[bkg_el[0]:bkg_el[1]]:
+                l+=1;
+                bkg_sum_+=p;
+        self.counts=sum_-float(bkg_sum_)/float(l)*float(k);
+        self.error =np.sqrt( sum_ + float(bkg_sum_)/float(l)*float(k) );
+        return self.counts,self.error;
+        
+class Sample:
+    def __init__(self):
+        self.live_time=datetime.timedelta(seconds=0); # time of sampling
+        self.real_time=datetime.timedelta(seconds=0);
+        self.timestamp=datetime.datetime.now(); #beginning of acquisition
+        #weather vals
+        self.weather_timestamps=np.zeros(0);
+        self.temp=np.zeros(0); #temperature array over time stamp
+        self.pressures=[];
+        self.solar=np.zeros(0);
+        self.relh=np.zeros(0);
+        self.wind_speed=np.zeros(0);
+        self.wind_dir=np.zeros(0);
+        self.rain=[];
+        #spectra vals
+        self.bin_lim=np.zeros(2);
+        self.bin_cal=np.zeros(2);
+        self.energy=[];
+        self.counts=[];
+        self.eff_curve=[];
+
+    def __add__(self,other):
+        self.live_time=self.live_time+other.live_time;
+        self.real_time=self.real_time+other.real_time;
+        #self.timestamp
+        #
+        self.weather_timestamps=np.hstack([self.weather_timestamps,other.weather_timestamps]);
+        self.temp=np.hstack([self.temp,other.temp]);
+        self.solar=np.hstack([self.solar,other.solar]);
+        self.relh=np.hstack([self.relh,other.relh]);
+        self.wind_speed=np.hstack([self.wind_speed,other.wind_speed]);
+        self.wind_dir=np.hstack([self.wind_dir,other.wind_dir]);
+        #
+        self.counts=self.counts+other.counts;
+        return self;
+    def __str__(self):
+        print_str=str(self.timestamp);
+        print_str=print_str+'\n\tWeather Timestamps: '+str(len(self.weather_timestamps));
+        print_str=print_str+'\n\tTemperatures: '+str(self.temp.shape);
+        print_str=print_str+'\n\tPressures: '+str(self.pressures.shape);
+        print_str=print_str+'\n\tSolar: '+str(self.solar.shape);
+        print_str=print_str+'\n\tRel. Hum.: '+str(self.relh.shape);
+        print_str=print_str+'\n\tWind Speed: '+str(self.wind_speed.shape);
+        print_str=print_str+'\n\tWind Dir.: ' + str(self.wind_dir.shape);
+        print_str=print_str+'\n\tLive Time: '+str(self.live_time);
+        print_str=print_str+'\n\tSpectra Channels: ' + str(self.bin_lim[1]-self.bin_lim[0]+1);
+        print_str=print_str+'\n\tEnergy Cal: ' + str(self.bin_cal[0])+'+'+str(self.bin_cal[1])+'x';
+        return print_str;
+    def set_weather_timestamps(self,weather_time):
+        self.weather_timestamps=weather_time;
+    def set_temps(self,temperatures):
+        self.temp=temperatures;
+    def set_pressures(self,pres):
+        self.pressures=pres;
+    def set_solars(self,solars):
+        self.solar=solars;
+    def set_relativehs(self,rhs):
+        self.relh=rhs;
+    def set_wind_speeds(self,wind_s):
+        self.wind_speed=wind_s;
+    def set_wind_dirs(self,dirs):
+        self.wind_dir=dirs;
+    def set_rain(self,rains):
+        self.rain=rains;
+    def set_weather_params(self,weather_timestamps,temperatures,pressures,solars,rhs,wind_s,wind_d,rain):
+        if( len(weather_timestamps)==0):
+            weather_timestamps=np.zeros(1);weather_timestamps[0]=np.nan;
+            temperatures=np.zeros(1);temperatures[0]=np.nan;
+            pressures=np.zeros(1);pressures[0]=np.nan;
+            solars=np.zeros(1);solars[0]=np.nan;
+            rhs=np.zeros(1);rhs[0]=np.nan;
+            wind_s=np.zeros(1);wind_s[0]=0;
+            wind_d=np.zeros(1);wind_d[0]=0;
+            
+        self.set_weather_timestamps(weather_timestamps);
+        self.set_temps(np.asarray(temperatures));
+        self.set_pressures(np.asarray(pressures));
+        self.set_solars(np.asarray(solars));
+        self.set_relativehs(np.asarray(rhs));
+        self.set_wind_speeds(np.asarray(wind_s));
+        self.set_wind_dirs(np.asarray(wind_d));
+        self.set_rain(np.asarray(rain));
+    def bool_weather_set(self):
+        return 0!=len(self.weather_timestamps);
+
+    def set_spectra(self,timestamps,real_times,live_times,bin_lims,bin_cals,energys,counts_):
+        self.timestamp=timestamps;
+        self.real_time=datetime.timedelta(seconds=real_times);
+        self.live_time=datetime.timedelta(seconds=live_times);
+        self.bin_lim=bin_lims;
+        self.bin_cal=bin_cals;
+        self.energy=energys;
+        self.counts=counts_;
+    def set_eff(self,eff_file):
+        self.eff_curve=np.asarray(spectra_utils.parse_eff(eff_file));
+    def bool_spec_set(self):
+        return 0!=(self.bin_lim[1]-self.bin_lim[0]);
+
+    def get_timestamp(self):
+        return self.timestamp;
+    def get_weather_timestamps(self):
+        return self.weather_timestamps;
+    def get_temps(self):
+        return self.temp;
+    def get_pressures(self):
+        return self.pressures;
+    def get_solars(self):
+        return self.solar;
+    def get_relativehs(self):
+        return self.relh;
+    def get_wind_speeds(self):
+        return self.wind_speed;
+    def get_wind_dirs(self):
+        return self.wind_dir;
+    def get_real_time(self):
+        return self.real_time;
+    def get_live_time(self):
+        return self.live_time;
+    def write_spe(self, out_file_name):
+        out_file=open(out_file_name,'w+');
+        out_file.write("$SPEC_ID:\nNo sample description was entered.\n$SPEC_REM:\nDET# 2\nDETDESC# RoofTopBEGE\nAP# GammaVision Version 6.09\n");
+        out_file.write("$DATE_MEA:\n");
+        tmp_date=self.timestamp;
+        mm_dd_yyyy='%(mm)02d-%(dd)02d-%(yyyy)04d '+str(tmp_date.hour)+":"+str(tmp_date.minute)+":"+str(tmp_date.second);
+        mm_dd_yyyy=mm_dd_yyyy % {"mm": tmp_date.month, "dd":tmp_date.day, "yyyy":float(tmp_date.year), "time": str(tmp_date.hour)+":"+str(tmp_date.minute)+":"+str(tmp_date.second)};
+        out_file.write(mm_dd_yyyy+"\n");
+        out_file.write("$MEAS_TIM:\n");
+        out_file.write(str(self.live_time.total_seconds())+" "+str(self.real_time.total_seconds())+"\n");
+        out_file.write("$DATA:\n");
+        out_file.write("1 "+str(len(self.counts)) +"\n");
+        for x in range(0,len(self.counts)):
+            out_file.write("{0:8}".format(int(self.counts[x]))+"\n");
+        out_file.write("$ENER_FIT:\n");
+        out_file.write(str(self.bin_cal[0])+" "+ str(self.bin_cal[1]) );
+        out_file.close();
+
+
+class SampleCollection:
+    def __init__(self):
+        self.collection=[];
+        self.rois=[];
+        self.eff_curve=[];
+    def __str__(self):
+	print len(self.collection);
+    def add_sample(self,sample):
+        self.collection.append(sample);
+    def add_roi(self,file_name):
+        self.rois=spectra_utils.parse_roi(file_name);
+    def set_eff(self,eff_file):
+        self.eff_curve=np.asarray(spectra_utils.parse_eff(eff_file));
+    def get_eff_for_binning(self,energy_bins):
+        eff=np.interp(energy_bins,self.eff_curve[:,0],self.eff_curve[:,1]);
+        return eff;
+    def rebin(self,delta_t):
+        if(0==len(self.collection)):
+            print 'Collection does not have any events';
+            return;
+        k=0;co=[];
+        while(k < len(self.collection)):
+            p=k;
+            tim=self.collection[p].timestamp+delta_t;
+            print tim;
+            while((k<len(self.collection)) and (tim > self.collection[k].timestamp)):
+                if(k==p):
+                    k=k+1;continue;
+                #self.collection[p]=self.collection[p]+self.collection[k];
+                self.collection[p].live_time=self.collection[p].live_time+self.collection[k].live_time;
+                self.collection[p].real_time=self.collection[p].real_time+self.collection[k].real_time;
+                #self.timestamp                                                                                                                                #                                                                                                                              
+                self.collection[p].weather_timestamps=np.hstack([self.collection[p].weather_timestamps,self.collection[k].weather_timestamps]);
+                self.collection[p].temp=np.hstack([ self.collection[p].temp,self.collection[k].temp]);
+                self.collection[p].pressures=np.hstack([self.collection[p].pressures,self.collection[k].pressures]);
+                self.collection[p].solar=np.hstack([self.collection[p].solar,self.collection[k].solar]);
+                self.collection[p].relh=np.hstack([self.collection[p].relh,self.collection[k].relh]);
+                self.collection[p].wind_speed=np.hstack([self.collection[p].wind_speed,self.collection[k].wind_speed]);
+                self.collection[p].wind_dir=np.hstack([self.collection[p].wind_dir,self.collection[k].wind_dir]);
+                self.collection[p].counts=self.collection[p].counts+self.collection[k].counts;
+                self.collection[p].rain=np.hstack([self.collection[p].rain,self.collection[k].rain]);
+                k=k+1;
+            co.append(self.collection[p]);
+        self.collection=co;
+                
+    def weighted_mean(self,first,second):
+    	sum_=[0,0];
+    	for n in range(0,len(first)):
+            sum_[0]=sum_[0]+first[n]*second[n];
+	    sum_[1]=sum_[1]+first[n];
+    	if(sum_[1]==0 or len(first)==0):
+	    return 0;
+        else:
+            return float(sum_[0])/float(sum_[1]);
+    def build_collection(self,spec_dir,weather_csv):
+        #spec_dir='/home/rtpavlovsk21/Dropbox/UCB Air Monitor/Data/Roof/PAVLOVSKY/';
+        timestamps_index=1;
+        temperature_index=2;
+        rh_index=7;
+        pres_index=8;
+        rain_index=12;
+        sola_index=13
+        winds_index=17;
+        windd_index=18;
+
+        list_of_lists,units,label,is_time_str,order=weather_utils.parse_weather_data(weather_csv);
+        
+        fil_list=glob.glob(spec_dir+'*/*.CNF'); fil_list.sort();
+        print "sample_collection::build_collection: finished dir sort";
+        for fi in range(0,len(fil_list)-2):
+            fil=fil_list[fi];
+            k=0;
+            sa = Sample();
+            sa= spectra_utils.parse_spectra(fil,sa);
+            p=weather_utils.discard_data_before_time(list_of_lists[timestamps_index],sa.get_timestamp(),k);
+            k=weather_utils.discard_data_before_time(list_of_lists[timestamps_index],sa.get_timestamp()+sa.get_real_time(),p);
+            sa.set_weather_params(list_of_lists[timestamps_index][p:k-1],list_of_lists[temperature_index][p:k-1],list_of_lists[pres_index][p:k-1],list_of_lists[sola_index][p:k-1],list_of_lists[rh_index][p:k-1],list_of_lists[winds_index][p:k-1],list_of_lists[windd_index][p:k-1],list_of_lists[rain_index][p:k-1]);
+            self.add_sample(sa);
+        print "sample_collection::build_collection: building done";
+    
+    def write_hdf(self,file_name):
+        out_file=h5py.File(file_name,'w');
+        ths_yr=out_file.create_group('2014');
+        timstmps=[];specs=[];weather_list=[];specs_meta=[];#weather_el=np.zeros(5);
+        for stmp in self.collection:
+            utc_tmsmp=calendar.timegm(stmp.get_timestamp().utctimetuple());
+            timstmps.append(utc_tmsmp);
+            specs_meta.append([stmp.real_time.total_seconds(), stmp.live_time.total_seconds(),stmp.bin_cal[0],stmp.bin_cal[1]]);
+            specs.append( stmp.counts );
+            if(stmp.bool_weather_set()):
+                weather_el=[ np.mean(stmp.temp), np.mean(stmp.pressures), np.mean(stmp.solar), np.mean(stmp.relh),self.weighted_mean(stmp.wind_speed,stmp.wind_dir),np.mean(stmp.wind_speed), np.sum(stmp.rain) ];
+            else:
+                weather_el=np.zeros(7);
+                weather_el[:]=np.NAN;
+            weather_list.append(weather_el);
+        ths_yr.create_dataset('timestamps',data=timstmps,dtype=np.dtype('uint32') );
+        ths_yr.create_dataset('spectra',data=specs, dtype=np.dtype('uint32'));
+        ths_yr.create_dataset('weather_data',data=weather_list,dtype=float);
+        ths_yr.create_dataset('spectra_meta',data=specs_meta,dtype=float);

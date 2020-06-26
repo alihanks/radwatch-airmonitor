@@ -1,0 +1,6 @@
+Disks that have small corruptions:
+dd the disk. can do this through the disk utility w/o mounting
+mount the iso that is created!
+
+Finding what was corrupted:
+sudo apt-get install smartmontools

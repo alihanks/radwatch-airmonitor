@@ -1,0 +1,9 @@
+addgroup sshlogin
+sudo emacs -nw /etc/ssh/sshd_config
+sudo usermod -a -G sshlogin grim
+sudo adduser --home /home/rtpavlovsk21 --ingroup sshlogin rtpavlovsk21
+lastlog
+id rtpavlovsk21
+apg
+sudo passwd rtpavlovsk21
+chage -d 0 rtpavlovsk21
