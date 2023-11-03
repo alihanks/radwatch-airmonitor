@@ -15,7 +15,7 @@ def send_mail(msg_):
     subject='Air Monitor Automail'
     to_='jahanks@berkeley.edu'
     from_='ucb.cram@gmail.com'
-    header='To:'+to_+'\n'+'From:'+from_+'\n'+'Subject'+subject+'\n'
+    header=r'To:'+to_+'\n'+r'From:'+from_+'\n'+'Subject'+subject+'\n'
     try:
         smtpserver.ehlo()
         smtpserver.starttls()
@@ -27,7 +27,7 @@ def send_mail(msg_):
         print("Could not authenticate")
     except smtplib.SMTPException:
         print("Could not send mail!!!")
-    except :
+    except:
         print("Could not connect to internet")
         
     smtpserver.close()
@@ -41,14 +41,14 @@ def acquire(restart,stop):
     if not os.path.exists(directory):
         os.makedirs(directory)
 
-    while( datetime.datetime.now()<stop_acq_time ):
+    while datetime.datetime.now()<stop_acq_time:
         subprocess.call(wait)
         out_file="\""+directory+"\\"+str(datetime.datetime.now()).replace(" ","_").replace(".","-").replace(":","-")+".cnf\""
         cmd="movedata det:LYNX01 "+out_file+" /overwrite"
         #print(cmd)
         subprocess.call(cmd)
         er=subprocess.call(restart)
-        if ( er )
+        if er:
             print("There were problems restarting the next acquisition")
             print("Trying to restart...")
             subprocess.call(stop)
@@ -61,7 +61,7 @@ def acquire(restart,stop):
                 print("Restart successful")
                 msg="Restarted acq after failing. Suggested quality check"
                 send_mail(msg)
-        if(datetime.datetime.now() > warn_acq_time):
+        if datetime.datetime.now() > warn_acq_time:
             msg="The acq has been running for 3.25 days. The filter should be changed every 3 days. Please tend to this before the deadline."
             send_mail(msg)
     return
@@ -73,14 +73,14 @@ def log_filter_start(log_name):
     with open(log_name,'w') as log_fil:
         for el in tim:
             log_fil.write(el.strftime(fmt)+"\n")
-    return;
+    return
     
 
 def times(log_name,fmt):
     lst=[]
     with open(log_name) as log_fil:
         for line in log_fil:
-            if(line=='\n'):
+            if line=='\n':
                 continue
             lst.append(datetime.datetime.strptime(line[:-1],fmt))
     return lst
