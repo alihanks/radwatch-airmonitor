@@ -33,9 +33,9 @@ def send_mail(msg_):
     smtpserver.close();
 
 def acquire(restart,stop):
-    file_path="C:\\Users\\BeARING\\Dropbox\\UCB Air Monitor\\Data\\Roof\\PAVLOVSKY\\";
+    #file_path="C:\\Users\\BeARING\\Dropbox\\UCB Air Monitor\\Data\\Roof\\PAVLOVSKY\\";
     file_path=r"C:\Users\ucbcr\Dropbox\UCB Air Monitor\Data\Roof\current"
-    directory=file_path+r"\"+str(datetime.datetime.now().year);
+    directory=file_path+"\\"+str(datetime.datetime.now().year);
     wait="wait det:LYNX01 /acq";
 
     if not os.path.exists(directory):
@@ -43,7 +43,7 @@ def acquire(restart,stop):
 
     while( datetime.datetime.now()<stop_acq_time ):
         subprocess.call(wait);
-        out_file="\""+directory+r"\"+str(datetime.datetime.now()).replace(" ","_").replace(".","-").replace(":","-")+".cnf\"";
+        out_file="\""+directory+"\\"+str(datetime.datetime.now()).replace(" ","_").replace(".","-").replace(":","-")+".cnf\"";
         cmd="movedata det:LYNX01 "+out_file+" /overwrite";
         #print cmd;
         subprocess.call(cmd);
