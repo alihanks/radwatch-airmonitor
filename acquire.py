@@ -13,7 +13,7 @@ def send_mail(msg_):
     msg_='\n'+msg_;
     smtpserver=smtplib.SMTP("smtp.gmail.com",587);
     subject='Air Monitor Automail';
-    to_='rtpavlovsk21@gmail.com'
+    to_='jahanks@berkeley.edu'
     from_='ucb.cram@gmail.com'
     header='To:'+to_+'\n'+'From:'+from_+'\n'+'Subject'+subject+'\n';
     try:
@@ -34,7 +34,8 @@ def send_mail(msg_):
 
 def acquire(restart,stop):
     file_path="C:\\Users\\BeARING\\Dropbox\\UCB Air Monitor\\Data\\Roof\\PAVLOVSKY\\";
-    directory=file_path+str(datetime.datetime.now().year);
+    file_path=r"C:\Users\ucbcr\Dropbox\UCB Air Monitor\Data\Roof\current"
+    directory=file_path+r"\"+str(datetime.datetime.now().year);
     wait="wait det:LYNX01 /acq";
 
     if not os.path.exists(directory):
@@ -42,7 +43,7 @@ def acquire(restart,stop):
 
     while( datetime.datetime.now()<stop_acq_time ):
         subprocess.call(wait);
-        out_file="\""+directory+"\\"+str(datetime.datetime.now()).replace(" ","_").replace(".","-").replace(":","-")+".cnf\"";
+        out_file="\""+directory+r"\"+str(datetime.datetime.now()).replace(" ","_").replace(".","-").replace(":","-")+".cnf\"";
         cmd="movedata det:LYNX01 "+out_file+" /overwrite";
         #print cmd;
         subprocess.call(cmd);
@@ -54,7 +55,7 @@ def acquire(restart,stop):
             if(subprocess.call(restart)):
                 print "Could not restart, exitting";
                 msg="The acq tried to restart, but couldn't. Here's the error number "+str(er);
-                send_email(msg);
+                send_mail(msg);
                 break;
             else:
                 print "Restart successful";
