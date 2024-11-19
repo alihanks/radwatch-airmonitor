@@ -20,6 +20,6 @@
 # For more information see the manual pages of crontab(5) and cron(8)
 # 
 # m h  dom mon dow   command
-0 * * * * /home/rtpavlovsk21/image_scripts/analysis/cron_job.sh
-0 * * * * /home/rtpavlovsk21/admin_stuff/mail/del_mail.sh
-18 * * * * /home/rtpavlovsk21/admin_stuff/dropbox_alive/alive.sh
+0 * * * * /home/dosenet/image_scripts/analysis/cron_job.sh
+0 * * * * /home/dosenet/admin_stuff/mail/del_mail.sh
+18 * * * * /home/dosenet/admin_stuff/dropbox_alive/alive.sh

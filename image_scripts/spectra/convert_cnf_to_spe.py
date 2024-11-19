@@ -19,7 +19,7 @@ f_specs_to_convert=open(specs_file);
 f_conv_specs=open(conv_specs,"a");
 for line in f_specs_to_convert:
     line=line.replace(" ","\\ ").replace("\n","");
-    fil_in_this_dir="./spectras/"+line.replace("/home/rtpavlovsk21/Dropbox/UCB\\ Air\\ Monitor/Data/Roof/PAVLOVSKY/","");
+    fil_in_this_dir="./spectras/"+line.replace("/home/dosenet/Dropbox/UCB\\ Air\\ Monitor/Data/Roof/PAVLOVSKY/","");
     cmd1="../xylib-1.3/xyconv " +line + " " + fil_in_this_dir.replace(".CNF",".txt");
     subprocess.call( cmd1 , shell=True);
     cmd2="python txt_to_spe.py " + fil_in_this_dir.replace(".CNF",".txt") + " " + fil_in_this_dir.replace(".CNF",".Spe");

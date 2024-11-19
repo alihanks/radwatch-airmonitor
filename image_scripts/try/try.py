@@ -22,7 +22,7 @@ def weighted_mean(first,second):
     else:
         return float(sum_[0])/float(sum_[1]);
 
-spec_dir='/home/rtpavlovsk21/Dropbox/UCB Air Monitor/Data/Roof/PAVLOVSKY/';
+spec_dir='/home/dosenet/Dropbox/UCB Air Monitor/Data/Roof/PAVLOVSKY/';
 
 timestamps_index=1;
 temperature_index=2;

@@ -75,7 +75,7 @@ spec_sum=np.sum(spec,0);
 
 #lets readin the rois
 col_comp=sample_collection.SampleCollection();
-col_comp.add_roi('/home/rtpavlovsk21/image_scripts/analysis/roi.dat');
+col_comp.add_roi('/home/dosenet/image_scripts/analysis/roi.dat');
 
 #make something with dimensions spec, nonzeros
 #at rois

@@ -1,9 +1,9 @@
 addgroup sshlogin
 sudo emacs -nw /etc/ssh/sshd_config
 sudo usermod -a -G sshlogin grim
-sudo adduser --home /home/rtpavlovsk21 --ingroup sshlogin rtpavlovsk21
+sudo adduser --home /home/dosenet --ingroup sshlogin dosenet
 lastlog
-id rtpavlovsk21
+id dosenet
 apg
-sudo passwd rtpavlovsk21
-chage -d 0 rtpavlovsk21
+sudo passwd dosenet
+chage -d 0 dosenet
