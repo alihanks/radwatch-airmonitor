@@ -227,7 +227,7 @@ class SampleCollection:
         else:
             return float(sum_[0])/float(sum_[1]);
     def build_collection(self,spec_dir,weather_csv):
-        #spec_dir='/home/dosenet/Dropbox/UCB Air Monitor/Data/Roof/PAVLOVSKY/';
+        #spec_dir='/home/dosenet/radwatch-airmonitor/Dropbox/UCB Air Monitor/Data/Roof/PAVLOVSKY/';
         timestamps_index=1;
         temperature_index=2;
         rh_index=7;

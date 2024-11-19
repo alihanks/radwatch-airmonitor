@@ -13,8 +13,8 @@
 /home/jinneykil
 /home/cfigueroa
 /home/plimley
-/home/dosenet
-/home/dosenet
+/home/dosenet/radwatch-airmonitor
+/home/dosenet/radwatch-airmonitor
 /home/radwatch
 /home/ne170
 /home/testNE170

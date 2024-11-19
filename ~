@@ -5,6 +5,6 @@ for root, dirs, files in os.walk("."):
         file_path = os.path.join(root, file)
         with open(file_path, "r") as f:
             lines = f.read()
-        lines = lines.replace("dosenet", "dosenet")
+        lines = lines.replace("dosenet/radwatch-airmonitor", "dosenet/radwatch-airmonitor")
         with open(file_path, "w") as f:
             f.write(lines)

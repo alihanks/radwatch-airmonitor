@@ -3,7 +3,7 @@ from matplotlib.pyplot import *;
 import datetime;
 
 
-fil = open('/home/dosenet/Dropbox/UCB Air Monitor/Data/Weather/weatherhawk.csv');
+fil = open('/home/dosenet/radwatch-airmonitor/Dropbox/UCB Air Monitor/Data/Weather/weatherhawk.csv');
 #fil=open('weatherhawk.csv');
 frmt='%Y-%m-%d %H:%M:%S';
 dims=[];

@@ -1,5 +1,5 @@
 #!/bin/bash
-export db="python $HOME/.dropbox/dropbox.py"
+export db="python $HOME/radwatch-airmonitor/.dropbox/dropbox.py"
 export k=`pgrep dropbox`
 
 if [ -z "$k" ]; then

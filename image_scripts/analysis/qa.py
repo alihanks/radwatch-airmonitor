@@ -30,9 +30,9 @@ for x in range(0,len(spec)):
     ax.append(x);
 col=sample_collection.SampleCollection();
 col_comp=sample_collection.SampleCollection();
-col.add_roi('/home/dosenet/image_scripts/analysis/roi_simple.dat');
-col.set_eff('/home/dosenet/image_scripts/analysis/roof.ecc');
-col_comp.add_roi('/home/dosenet/image_scripts/analysis/roi.dat');
+col.add_roi('/home/dosenet/radwatch-airmonitor/image_scripts/analysis/roi_simple.dat');
+col.set_eff('/home/dosenet/radwatch-airmonitor/image_scripts/analysis/roof.ecc');
+col_comp.add_roi('/home/dosenet/radwatch-airmonitor/image_scripts/analysis/roi.dat');
 
 #roi report
 res=np.zeros((len(col.rois),2));k=0;

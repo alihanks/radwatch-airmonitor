@@ -4,10 +4,10 @@ sys.path.insert(0,'..');
 import sample_collection;
 import weather_utils;
 
-spec_dir='/home/dosenet/Dropbox/UCB Air Monitor/Data/Roof/PAVLOVSKY/';
-weat_csv='/home/dosenet/Dropbox/UCB Air Monitor/Data/Weather/weatherhawk.csv';
+spec_dir='/home/dosenet/radwatch-airmonitor/Dropbox/UCB Air Monitor/Data/Roof/PAVLOVSKY/';
+weat_csv='/home/dosenet/radwatch-airmonitor/Dropbox/UCB Air Monitor/Data/Weather/weatherhawk.csv';
 weat_csv_sorted='weather_sorted.csv';
-roi_dat='/home/dosenet/image_scripts/analysis/roi.dat';
+roi_dat='/home/dosenet/radwatch-airmonitor/image_scripts/analysis/roi.dat';
 
 weather_utils.resort_weather_timestamps(weat_csv,weat_csv_sorted);
 print "resorted the weather data";

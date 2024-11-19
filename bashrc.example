@@ -107,5 +107,5 @@ if [ -f /etc/bash_completion ] && ! shopt -oq posix; then
 fi
 export EDITOR="emacs -nw"
 alias emacs="emacs -nw"
-. /home/dosenet/.color
-alias db="python /home/dosenet/.dropbox/dropbox.py"
+. /home/dosenet/radwatch-airmonitor/.color
+alias db="python /home/dosenet/radwatch-airmonitor/.dropbox/dropbox.py"

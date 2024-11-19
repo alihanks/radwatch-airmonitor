@@ -1,9 +1,9 @@
 addgroup sshlogin
 sudo emacs -nw /etc/ssh/sshd_config
 sudo usermod -a -G sshlogin grim
-sudo adduser --home /home/dosenet --ingroup sshlogin dosenet
+sudo adduser --home /home/dosenet/radwatch-airmonitor --ingroup sshlogin dosenet/radwatch-airmonitor
 lastlog
-id dosenet
+id dosenet/radwatch-airmonitor
 apg
-sudo passwd dosenet
-chage -d 0 dosenet
+sudo passwd dosenet/radwatch-airmonitor
+chage -d 0 dosenet/radwatch-airmonitor

@@ -5,7 +5,7 @@ import numpy as np;
 fil_fil=h5py.File('try.hdf','r+');
 fils=fil_fil['/2014/files'];
 
-spec_dir='/home/dosenet/Dropbox/UCB Air Monitor/Data/Roof/PAVLOVSKY/';
+spec_dir='/home/dosenet/radwatch-airmonitor/Dropbox/UCB Air Monitor/Data/Roof/PAVLOVSKY/';
 fil_list=glob.glob(spec_dir+'*/*.CNF'); fil_list.sort();
 fil_list=np.asarray(fil_list);
 print fils[0]==fil_list[0];

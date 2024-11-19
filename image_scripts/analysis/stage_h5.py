@@ -45,9 +45,9 @@ for x in range(0,len(spec)):
     ax.append( (x+1)*cals[1,3]+cals[1,2]);
 col=sample_collection.SampleCollection();
 col_comp=sample_collection.SampleCollection();
-col.add_roi('/home/dosenet/image_scripts/analysis/roi_simple.dat');
-col.set_eff('/home/dosenet/image_scripts/analysis/roof.ecc');
-col_comp.add_roi('/home/dosenet/image_scripts/analysis/roi.dat');
+col.add_roi('/home/dosenet/radwatch-airmonitor/image_scripts/analysis/roi_simple.dat');
+col.set_eff('/home/dosenet/radwatch-airmonitor/image_scripts/analysis/roof.ecc');
+col_comp.add_roi('/home/dosenet/radwatch-airmonitor/image_scripts/analysis/roi.dat');
 
 #eff=col.get_eff_for_binning(ax); 
 #for x in range(0,len(spec)):
