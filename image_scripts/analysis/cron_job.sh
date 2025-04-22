@@ -5,19 +5,17 @@ SHELL=/bin/bash
 XDG_SESSION_COOKIE=8342d40a26d074e931c6e4e600000004-1393211401.179579-245733898
 USER=dosenet/radwatch-airmonitor
 MAIL=/var/mail/dosenet/radwatch-airmonitor
-PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/games
+#PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/games
+PATH=/home/dosenet/anaconda3/bin:/home/dosenet/anaconda3/condabin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/games:/usr/local/games:/snap/bin:/snap/bin
 PWD=/home/dosenet/radwatch-airmonitor
 LANG=en_US.UTF-8
 SHLVL=1
 HOME=/home/dosenet/radwatch-airmonitor
 LOGNAME=dosenet/radwatch-airmonitor
 DISPLAY=localhost:10.0
-_=/usr/bin/env
+#_=/usr/bin/env
 
 date;
-AGENT_INFO=/home/dosenet/radwatch-airmonitor/.agent_info; export AGENT_INFO
-eval `ssh-agent -s`
-ssh-add ~/.fake/kepler_unpro
 
 cd /home/dosenet/radwatch-airmonitor/image_scripts/analysis/
 pwd > /home/dosenet/radwatch-airmonitor/image_scripts/analysis/out.txt
@@ -29,8 +27,8 @@ mkdir rooftop_tmp
 mv *.png ./rooftop_tmp
 mv weather.csv ./rooftop_tmp
 mv weather_bq.csv ./rooftop_tmp
-tar cvf rooftop.tar rooftop_tmp
-scp rooftop.tar rpavlovs@kepler.berkeley.edu:/tmp
-ssh rpavlovs@kepler.berkeley.edu 'bash -s' < unpacking_script.sh
+#tar cvf rooftop.tar rooftop_tmp
+#scp rooftop.tar rpavlovs@kepler.berkeley.edu:/tmp
+#ssh rpavlovs@kepler.berkeley.edu 'bash -s' < unpacking_script.sh
 env >> /home/dosenet/radwatch-airmonitor/image_scripts/analysis/out.txt
-kill $SSH_AGENT_PID
+#kill $SSH_AGENT_PID

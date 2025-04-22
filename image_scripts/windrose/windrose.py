@@ -15,10 +15,26 @@ from matplotlib.text import Text, FontProperties
 from matplotlib.projections.polar import PolarAxes
 from numpy.lib.twodim_base import histogram2d
 import matplotlib.pyplot as plt
-from pylab import poly_between
+#from pylab import poly_between
 
 RESOLUTION = 100
 ZBASE = -1000 #The starting zorder for all drawing, negative to have the grid on
+
+def poly_between(x, y1, y2=0):
+    """
+    Return vertices of a polygon that fills the space between y1 and y2
+    where y2 can be a scalar or another array like y1.
+    """
+    if not hasattr(y2, '__iter__'):
+        y2 = np.ones_like(y1) * y2
+    
+    N = len(x)
+    vertices = np.vstack((
+        np.hstack((x, x[::-1])),
+        np.hstack((y1, y2[::-1]))
+    )).T
+    
+    return vertices[:, 0], vertices[:, 1]
 
 class WindroseAxes(PolarAxes):
     """
@@ -435,7 +451,7 @@ def histogram(dir, var, bins, nsector, normed=False, blowto=False):
     """
 
     if len(var) != len(dir):
-        raise ValueError, "var and dir must have same length"
+        raise ValueError("var and dir must have same length")
 
     angle = 360./nsector
 
@@ -538,7 +554,7 @@ if __name__=='__main__':
     l = ax.legend(axespad=-0.10)
     setp(l.get_texts(), fontsize=10)
     draw()
-    #print ax._info
+    #print(ax._info)
     show()
 
 

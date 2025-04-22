@@ -9,3 +9,6 @@ if [ -z "$k" ]; then
 else
     echo $k
 fi
+
+#To-Do: Hack to keep video files from filling the drive
+# rm Dropbox/Apps/CRaNBARI\ \(1\)/breezeway/video/*
