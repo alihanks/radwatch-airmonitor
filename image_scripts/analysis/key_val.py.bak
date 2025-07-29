@@ -6,15 +6,15 @@ def start_element(name, attrs):
         tmp_array=[]
     if(name=="col"):
         tmp_array.append(attrs)
-    print(('Start element:', name, attrs))
+    print('Start element:', name, attrs)
 def end_element(name):
     if(name=="array"):
         array.append(tmp_array)
     if(name=="col"):
         pass;
-    print(('End element:', name))
+    print('End element:', name)
 def char_data(data):
-    print(('Character data:', repr(data)))
+    print('Character data:', repr(data))
 
 array=[]
 tmp_array=[]
@@ -24,7 +24,7 @@ p.StartElementHandler = start_element
 p.EndElementHandler = end_element
 p.CharacterDataHandler = char_data
 
-fil=open('data_desc.xml')
-p.Parse(fil.read().replace("\n","").replace("\t","").replace("  "," ").replace("  "," ").replace("  "," ").replace("> <","><"))
+fil=open('data_desc.xml');
+p.Parse(fil.read().replace("\n","").replace("\t","").replace("  "," ").replace("  "," ").replace("  "," ").replace("> <","><"));
 
-print(array)
+print(array);
