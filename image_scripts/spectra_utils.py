@@ -22,6 +22,7 @@ from ctypes import c_char_p, c_double
 import datetime
 import sys
 sys.path.insert(0, '..')
+sys.path.insert(0, '../..')
 #import sample_collection
 import numpy as np
 
@@ -46,13 +47,14 @@ free_dataset = xylib.xylib_free_dataset
 #file name is ascii path of file, sample is the 
 #sample class from sample_colllection.py
 def parse_spectra(file_name, sample):
-
+    if hasattr(file_name, 'encode'):
+        file_name = file_name.encode('utf-8')
     if not os.path.isfile(file_name):
         print(f"File does not exist: {file_name}")
         return sample  # Return the sample object, not an integer
     
     try:
-        dataset = load_file(file_name.encode('utf-8'), None, None)  # Encode filename to bytes
+        dataset = load_file(file_name, "cnf", None)  # Encode filename to bytes
         if not dataset:
             print(f"Failed to load dataset for: {file_name}")
             return sample  # Return the sample object, not an integer
@@ -74,9 +76,9 @@ def parse_spectra(file_name, sample):
         acq_ener_cal0 = float(block_metadata(block, 'energy calib 0'))
         acq_ener_cal1 = float(block_metadata(block, 'energy calib 1'))
         acq_ener_cal2 = float(block_metadata(block, 'energy calib 2'))
+        print(f"Acquired Real Time: {acq_real_time}\n")
 
-        free_dataset(dataset)
-
+        
         # In Python 3, block_metadata returns bytes instead of str
         if isinstance(tmp_time, bytes):
             tmp_time = tmp_time.decode('utf-8')
@@ -86,6 +88,8 @@ def parse_spectra(file_name, sample):
         acq_cals = [acq_ener_cal0, acq_ener_cal1, acq_ener_cal2]
         
         sample.set_spectra(acq_time, acq_real_time, acq_live_time, acq_bin_lims, acq_cals, data[:, 0], data[:, 1])
+
+        free_dataset(dataset)
         return sample
 
     except Exception as e:

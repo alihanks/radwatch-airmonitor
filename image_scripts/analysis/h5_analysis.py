@@ -11,6 +11,7 @@ import os
 import numpy as np  # Adding numpy import that was implied but not explicit
 sys.path.insert(0, '..')
 sys.path.insert(0, '.')
+sys.path.insert(0, '../..')
 from image_scripts import sample_collection
 from image_scripts import weather_utils
 from image_scripts import time_utils
@@ -30,15 +31,29 @@ def time_indicies(timestamps,timed):
     return ind
             
 # color palette
-with open('../etc/colr/col_scheme.dat', 'r') as f:
-    col_pal = f.readlines()
-col_pal = [el.replace('\n', '') for el in col_pal]
+#with open('../etc/colr/col_scheme.dat', 'r') as f:
+#    col_pal = f.readlines()
+#col_pal = [el.replace('\n', '') for el in col_pal]
+col_pal = ['#00B2A5',
+            '#D9661F',
+            '#00B0DA',
+            '#FDB515',
+            '#ED4E33',
+            '#2D637F',
+            '#9DAD33',
+            '#53626F',
+            '#EE1F60',
+            '#6C3302',
+            '#C2B9A7',
+            '#CFDD45',
+            '#003262']
 
 # get the data
 file = h5py.File('./rebin.h5', 'r')
 tmstmps = file['/2014/timestamps']
 tm_meta = file['/2014/spectra_meta']
 spectra = file['/2014/spectra']
+print(spectra)
 cals = file['/2014/spectra_meta']
 weather = file['/2014/weather_data']
 s = [len(spectra[:, 1]), len(spectra[1, :])]

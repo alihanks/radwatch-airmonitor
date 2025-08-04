@@ -197,6 +197,7 @@ class Sample:
             out_file.write("$MEAS_TIM:\n")
             out_file.write(str(self.live_time.total_seconds()) + " " + str(self.real_time.total_seconds()) + "\n")
             out_file.write("$DATA:\n")
+            print(self.counts)
             out_file.write("1 " + str(len(self.counts)) + "\n")
             for x in range(0, len(self.counts)):
                 out_file.write("{0:8}".format(int(self.counts[x])) + "\n")
@@ -208,7 +209,7 @@ class Sample:
     
         image = Image.new("RGBA", (3000, 240), (255, 255, 255))
         draw = ImageDraw.Draw(image)
-        font = ImageFont.truetype("../etc/fonts/vera_sans/Vera.ttf", 244)
+        font = ImageFont.truetype("/home/dosenet/etc/fonts/vera_sans/Vera.ttf", 244)
 
         draw.text((0, 0), self.timestamp.strftime("%a, %b %d at %I:%M%p"), (0, 0, 0), font=font)
         image_resized = image.resize((3000, 240), Image.ANTIALIAS)

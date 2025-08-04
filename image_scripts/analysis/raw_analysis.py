@@ -1,13 +1,14 @@
 import sys
 import datetime
 sys.path.insert(0,'..')
+sys.path.insert(0,'../..')
 from image_scripts import sample_collection
 from image_scripts import weather_utils
 
-spec_dir='/home/dosenet/Dropbox/UCB Air Monitor/Data/Roof/current/'
-weat_csv='/home/dosenet/Dropbox/UCB Air Monitor/Data/Weather/weatherhawk.csv'
-weat_csv_sorted='weather_sorted.csv'
-roi_dat='/home/dosenet/radwatch-airmonitor/image_scripts/analysis/roi.dat'
+spec_dir=r'/home/dosenet/Dropbox/UCB Air Monitor/Data/Roof/current/temp_test_folder'
+weat_csv=r'/home/dosenet/Dropbox/UCB Air Monitor/Data/Weather/weatherhawk.csv'
+weat_csv_sorted=r'weather_sorted.csv'
+roi_dat=r'/home/dosenet/radwatch-airmonitor/image_scripts/analysis/roi.dat'
 
 weather_utils.resort_weather_timestamps(weat_csv,weat_csv_sorted)
 print("resorted the weather data")
