@@ -1,8 +1,8 @@
 import sys
 import datetime
 sys.path.insert(0,'..')
-import sample_collection
-import weather_utils
+from image_scripts import sample_collection
+from image_scripts import weather_utils
 
 spec_dir='/home/dosenet/Dropbox/UCB Air Monitor/Data/Roof/current/'
 weat_csv='/home/dosenet/Dropbox/UCB Air Monitor/Data/Weather/weatherhawk.csv'

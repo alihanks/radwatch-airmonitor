@@ -11,9 +11,9 @@ import os
 import numpy as np  # Adding numpy import that was implied but not explicit
 sys.path.insert(0, '..')
 sys.path.insert(0, '.')
-import sample_collection
-import weather_utils
-import time_utils
+from image_scripts import sample_collection
+from image_scripts import weather_utils
+from image_scripts import time_utils
 
 def time_indicies(timestamps,timed):
     p=0

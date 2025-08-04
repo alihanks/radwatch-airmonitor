@@ -1,4 +1,4 @@
-import numpy as pylab;
+import numpy as pylab
 
 def geo_efficiency(energy_keV):
     params = [-5.02, -1.272, -0.8367, -0.7216, -0.241, -0.02549]
@@ -9,4 +9,4 @@ def geo_efficiency(energy_keV):
     return pylab.exp(ln_eff)
 
 for x in range(0,5000,10):
-    print x, geo_efficiency(x), 1,1;
+    print(x, geo_efficiency(x), 1,1)
