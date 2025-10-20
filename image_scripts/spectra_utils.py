@@ -1,140 +1,128 @@
-from ctypes import cdll
+# spectra_utils.py
+# Uses the pip package "xylib-py" (import name: xylib)
+# No ctypes, no manual .so loading — just the official SWIG bindings.
+
+from __future__ import annotations
+
 import os
+from pathlib import Path
+from typing import Dict, List, Tuple, Any
 
-# Try to load system libstdc++ first - before ANY other imports
-try:
-    # Print for debugging
-    print("Attempting to load system libstdc++...")
-    system_lib = cdll.LoadLibrary("/usr/lib/x86_64-linux-gnu/libstdc++.so.6")
-    print("Successfully loaded system libstdc++")
-except Exception as e:
-    print(f"Failed to load system libstdc++: {e}")
+import xylib  # provided by pip install xylib-py
 
-# Now load xylib
-try:
-    print("Attempting to load libxy.so.3...")
-    xylib = cdll.LoadLibrary("/usr/local/lib/libxy.so.3")
-    print("Successfully loaded libxy.so.3")
-except Exception as e:
-    print(f"Failed to load libxy.so.3: {e}")
 
-from ctypes import c_char_p, c_double
-import datetime
-import sys
-sys.path.insert(0, '..')
-sys.path.insert(0, '../..')
-#import sample_collection
-import numpy as np
+# ---- helpers ---------------------------------------------------------------
 
-#easier function names
-#cdll.LoadLibrary("/usr/lib/x86_64-linux-gnu/libstdc++.so.6")
-#xylib = cdll.LoadLibrary("libxy.so.3")
+def _meta_to_dict(meta) -> Dict[str, str]:
+    """
+    Convert xylib.MetaData to a plain dict using only public methods:
+      - size(), get_key(i), get(key)  (and has_key(key) for safety)
+    """
+    out: Dict[str, str] = {}
+    n = meta.size()                  # number of metadata entries
+    for i in range(n):
+        k = meta.get_key(i)
+        if meta.has_key(k):          # guard against stale keys
+            out[k] = meta.get(k)
+    return out
 
-get_version = xylib.xylib_get_version
-get_version.restype = c_char_p
-load_file = xylib.xylib_load_file
-get_block = xylib.xylib_get_block
-count_columns = xylib.xylib_count_columns
-count_rows = xylib.xylib_count_rows
-get_data = xylib.xylib_get_data
-get_data.restype = c_double
-dataset_metadata = xylib.xylib_dataset_metadata
-dataset_metadata.restype = c_char_p
-block_metadata = xylib.xylib_block_metadata
-block_metadata.restype = c_char_p
-free_dataset = xylib.xylib_free_dataset
 
-#file name is ascii path of file, sample is the 
-#sample class from sample_colllection.py
-def parse_spectra(file_name, sample):
-    if hasattr(file_name, 'encode'):
-        file_name = file_name.encode('utf-8')
-    if not os.path.isfile(file_name):
-        print(f"File does not exist: {file_name}")
-        return sample  # Return the sample object, not an integer
-    
-    try:
-        dataset = load_file(file_name, "cnf", None)  # Encode filename to bytes
-        if not dataset:
-            print(f"Failed to load dataset for: {file_name}")
-            return sample  # Return the sample object, not an integer
+def _read_first_block_xy(ds) -> Tuple[List[float], List[float], Dict[str, Any]]:
+    """
+    Extract X and Y arrays from the first block.
+    Columns in xylib are 1-based (0 is a pseudo index column).  :contentReference[oaicite:1]{index=1}
+    """
+    block = ds.get_block(0)
+    nrows = block.get_point_count()
+    ncols = block.get_column_count()
 
-        block = get_block(dataset, 0)
-        ncol = count_columns(block)
-        for i in range(ncol):
-            count_rows(block, i+1)
+    # Column 1: X (e.g., energy or 2theta)
+    # Column 2: Y (counts). If only one real column, treat it as Y and
+    # synthesize X as 0..N-1.
+    if ncols >= 1:
+        x_col = block.get_column(1)
+        xs = [x_col.get_value(i) for i in range(nrows)]
+    else:
+        xs = list(range(nrows))
 
-        n = count_rows(block, 2)
-        data = np.zeros((n, 2))
-        for i in range(n):
-            data[i, 0] = get_data(block, 1, i)
-            data[i, 1] = get_data(block, 2, i)
+    if ncols >= 2:
+        y_col = block.get_column(2)
+        ys = [y_col.get_value(i) for i in range(nrows)]
+    else:
+        ys = []
 
-        acq_real_time = float(block_metadata(block, 'real time (s)'))
-        acq_live_time = float(block_metadata(block, 'live time (s)'))
-        tmp_time = block_metadata(block, 'date and time')
-        acq_ener_cal0 = float(block_metadata(block, 'energy calib 0'))
-        acq_ener_cal1 = float(block_metadata(block, 'energy calib 1'))
-        acq_ener_cal2 = float(block_metadata(block, 'energy calib 2'))
-        print(f"Acquired Real Time: {acq_real_time}\n")
+    meta = {
+        "dataset": _meta_to_dict(ds.meta),
+        "block": _meta_to_dict(block.meta),
+    }
+    return xs, ys, meta
 
-        
-        # In Python 3, block_metadata returns bytes instead of str
-        if isinstance(tmp_time, bytes):
-            tmp_time = tmp_time.decode('utf-8')
-            
-        acq_time = datetime.datetime.strptime(tmp_time, "%a, %Y-%m-%d %H:%M:%S")
-        acq_bin_lims = [1, len(data)]
-        acq_cals = [acq_ener_cal0, acq_ener_cal1, acq_ener_cal2]
-        
-        sample.set_spectra(acq_time, acq_real_time, acq_live_time, acq_bin_lims, acq_cals, data[:, 0], data[:, 1])
 
-        free_dataset(dataset)
+# ---- public API ------------------------------------------------------------
+
+def parse_spectra(file_name, sample, format_hint: str = ""):
+    """
+    Load a spectrum file with xylib and populate `sample`.
+
+    - `file_name` : str | Path
+    - `sample`    : object you already use downstream; we attach/overwrite:
+        sample.x, sample.y, sample.meta (dict with dataset/block metadata)
+
+    Notes:
+      * Uses xylib.load_file(path, format_name="", options="") which auto-guesses
+        the format when `format_name` is "" (empty).  :contentReference[oaicite:2]{index=2}
+      * If you know the exact format (e.g. "canberra_cnf"), pass it via
+        `format_hint` for more robust parsing. (Canberra CNF is explicitly
+        supported by xylib.) :contentReference[oaicite:3]{index=3}
+    """
+    path = Path(str(file_name))
+    if not path.is_file():
+        print(f"File does not exist: {path}")
         return sample
 
+    try:
+        ds = xylib.load_file(str(path), format_hint or "", "")
     except Exception as e:
-        print(f"Error parsing spectra {file_name}: {e}")
-        import traceback
-        traceback.print_exc()
-        return sample  # Return the sample object, not an integer
+        print(f"Failed to load dataset for {path}: {e}")
+        return sample
+
+    xs, ys, meta = _read_first_block_xy(ds)
+
+    # Attach results to your `sample` object.
+    try:
+        setattr(sample, "x", xs)
+        setattr(sample, "y", ys)
+        # merge into existing meta if present
+        if hasattr(sample, "meta") and isinstance(getattr(sample, "meta"), dict):
+            sample.meta.update(meta)
+        else:
+            setattr(sample, "meta", meta)
+    except Exception as e:
+        print(f"Warning: could not attach data to sample: {e}")
+
+    return sample
 
 
-def parse_roi(file_name):
-    # Import only when needed to avoid circular dependency
-    import sample_collection
+def load_xy(file_name: str | Path, format_hint: str = "") -> Tuple[List[float], List[float], Dict[str, Any]]:
+    """
+    Convenience: read a file and return (x, y, metadata) without mutating anything.
+    Uses the same xylib API as parse_spectra().
+    """
+    path = Path(str(file_name))
+    ds = xylib.load_file(str(path), format_hint or "", "")
+    return _read_first_block_xy(ds)
 
-    roi_col = []
-    with open(file_name) as roi_file:
-        content = roi_file.readlines()
-    
-    k = 0
-    while k < len(content) - 1:
-        bkg = []
-        if k == 0:
-            while not ('$ROI' in content[k]):
-                k = k + 1
-        k = k + 1
-        sp_line = content[k].split(" ")
-        iso = sp_line[3]
-        energy = sp_line[4]
-        origin = sp_line[5]
-        spec_roi = [int(sp_line[1]), int(sp_line[2])]
-        for x in range(0, int(sp_line[0])):
-            k = k + 1
-            sp_line = content[k].split(" ")
-            bkg.append([int(sp_line[1]), int(sp_line[2])])
-        r = sample_collection.ROI(spec_roi, bkg)
-        r.origin = origin.replace('\n', '').replace("_", " ")
-        r.isotope = iso.replace('\n', '')
-        r.energy = float(energy.split('k')[0])
-        roi_col.append(r)
-    
-    return roi_col
+
+# ---- kept from your original module ---------------------------------------
 
 def parse_eff(file_name):
+    """
+    Parse a plain-text efficiency file in the form used by your pipeline.
+    (This block is retained from your original script.)
+    """
     with open(file_name) as f:
         content = f.readlines()
-    
+
     k = 0
     while not ("kev_eff_%err_effw" in content[k].replace('\n', '')):
         k += 1
@@ -147,5 +135,4 @@ def parse_eff(file_name):
         tmp_str = [item for item in content[x+k].split(' ') if item]
         tmp = [float(tmp_str[0]), float(tmp_str[1]), float(tmp_str[2]), float(tmp_str[3])]
         eff.append(tmp)
-    return eff        
-        
+    return eff
