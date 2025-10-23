@@ -1,5 +1,3 @@
-Files for the airmonitoring system to run. 
+This is the code base and file structure for the RadWatch rooftop data processing and website image generation.
 
-Unfortunately, this project is tenously strung together and does depend on the directory structure. Be careful when moving files. The links are not transparent as they could be. 
-
-Ryan 
+  A detailed workflow with some specifics for the raw spectrum file processing is provided here [https://github.com/alihanks/radwatch-airmonitor/wiki/Plot-creation-work%E2%80%90flow]
