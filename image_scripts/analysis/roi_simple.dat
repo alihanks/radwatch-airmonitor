@@ -1,0 +1,19 @@
+$ROI:
+2 913 928 Pb214 351.71keV Naturally_Occurring(U238)
+- 885 902
+- 938 955
+1 1587 1600 Bi214 608.7keV Naturally_Occurring(U238)
+- 1610 1625
+1 622 627 Pb212 238.6keV Naturally_Occurring(Th232)
+- 613 619
+2 6822 6837 Tl208 2612.5keV Naturally_Occurring(Th232)
+- 6802 6812
+- 6843 6852
+2 3807 3828 K40 1459.41keV Naturally_Occurring
+- 3772 3795
+- 3837 3862
+1 1577 1582 Cs134 604keV Reactor
+- 1561 1569
+2 1726 1735 Cs137 661.7keV Technically_Enchanced/Naturally_Occurring
+- 1709 1718
+- 1744 1753
