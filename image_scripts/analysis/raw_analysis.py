@@ -1,20 +1,20 @@
+from image_scripts import weather_utils
+from image_scripts import sample_collection
 import sys
 import datetime
-sys.path.insert(0,'..')
-sys.path.insert(0,'../..')
-from image_scripts import sample_collection
-from image_scripts import weather_utils
+sys.path.insert(0, '..')
+sys.path.insert(0, '../..')
 
-spec_dir=r'/home/dosenet/Dropbox/UCB Air Monitor/Data/Roof/current/temp_test_folder'
-weat_csv=r'/home/dosenet/Dropbox/UCB Air Monitor/Data/Weather/weatherhawk.csv'
-weat_csv_sorted=r'weather_sorted.csv'
-roi_dat=r'/home/dosenet/radwatch-airmonitor/image_scripts/analysis/roi.dat'
+spec_dir = r'/home/dosenet/Dropbox/UCB Air Monitor/Data/Roof/current/temp_test_folder'
+weat_csv = r'/home/dosenet/Dropbox/UCB Air Monitor/Data/Weather/weatherhawk.csv'
+weat_csv_sorted = r'weather_sorted.csv'
+roi_dat = r'/home/dosenet/radwatch-airmonitor/image_scripts/analysis/roi.dat'
 
-weather_utils.resort_weather_timestamps(weat_csv,weat_csv_sorted)
+weather_utils.resort_weather_timestamps(weat_csv, weat_csv_sorted)
 print("resorted the weather data")
 col = sample_collection.SampleCollection()
 print("Collection made")
-col.build_collection(spec_dir,weat_csv_sorted)
+col.build_collection(spec_dir, weat_csv_sorted)
 print("Collection built")
 print("Size ", len(col.collection))
 #col.rebin(datetime.timedelta(minutes=20));
