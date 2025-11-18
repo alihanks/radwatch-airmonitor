@@ -3,8 +3,7 @@ import pandas as pd
 import datetime
 import math
 
-# CSV_PATH = '/home/dosenet/radwatch-airmonitor/Dropbox/UCB Air Monitor/Data/Weather/weatherhawk.csv'
-CSV_PATH = r"C:\Users\vlfil\Downloads\weatherhawk.csv"
+CSV_PATH = '/home/dosenet/radwatch-airmonitor/Dropbox/UCB Air Monitor/Data/Weather/weatherhawk.csv'
 
 NSEW_TO_DEG = {'N':180,'S':0,'E':270,'W':90,
                'North':180,'South':0,'East':270,'West':90,
@@ -30,6 +29,10 @@ def gather_data():
 
     # time conversion
     data_frame['Time'] = pd.to_datetime(str(date) + ' ' + data_frame['Time'], format='%Y-%m-%d %I:%M %p')
+
+    # prevent existing data from being added again
+    last_timestamp = get_last_timestamp()
+    data_frame = data_frame[data_frame['Time'] > last_timestamp]
 
     # clean data of units
     measurement_cols = list(set(data_frame.columns) - {'Time'}) # excluding columns for measurement extraction
@@ -70,6 +73,13 @@ def assemble(df):
 
     df = pd.DataFrame(dict)
     return df
+
+def get_last_timestamp():       # this determines the datetime of the last entry in the csv.
+    for chunk in pd.read_csv(CSV_PATH, chunksize=1000, usecols=['Date Time']):
+        val = chunk['Date Time'].iloc[-1]
+        if val is not None:
+            out = val
+    return pd.Timestamp(out)
 
 if(__name__=='__main__'):
     gather_data()
