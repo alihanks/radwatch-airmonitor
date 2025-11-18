@@ -3,7 +3,8 @@ import pandas as pd
 import datetime
 import math
 
-CSV_PATH = '/home/dosenet/radwatch-airmonitor/Dropbox/UCB Air Monitor/Data/Weather/weatherhawk.csv'
+# CSV_PATH = '/home/dosenet/radwatch-airmonitor/Dropbox/UCB Air Monitor/Data/Weather/weatherhawk.csv'
+CSV_PATH = r"C:\Users\vlfil\Downloads\weatherhawk.csv"
 
 NSEW_TO_DEG = {'N':180,'S':0,'E':270,'W':90,
                'North':180,'South':0,'East':270,'West':90,
@@ -59,7 +60,7 @@ def assemble(df):
     dict['Battery'] = math.nan
     dict['MinBattery'] = math.nan               # these labels don't seem to correspond with anything
     dict['ETo'] = math.nan
-    dict['Rain Yearly'] = math.nan              # a daily precip. accum. measurement exists
+    dict['Rain Yearly'] = df['Precip. Accum.']              # a daily precip. accum. measurement exists
     dict['Solar Avg'] = df['Solar']             # this in w/m^2, does it require conversion?
     dict['Wind Speed Avg'] = df['Speed']
     dict['Wind Speed Max'] = df['Gust']         # assuming gust = max wind speed
