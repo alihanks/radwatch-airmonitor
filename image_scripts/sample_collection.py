@@ -1,3 +1,7 @@
+from itertools import chain
+import calendar
+import weather_utils
+from time_utils import *
 import numpy as np
 import h5py
 import datetime
@@ -6,11 +10,8 @@ import glob
 import os
 import sys
 sys.path.insert(0, "..")
-from time_utils import *
 #import spectra_utils
-import weather_utils
-import calendar
-from itertools import chain
+
 
 class ROI:
     def __init__(self, roi_peak, roi_bkg):
@@ -21,6 +22,7 @@ class ROI:
         self.counts = []
         self.energy = []
         self.errors = []
+
     def get_counts(self, spec):
         sum_ = 0
         k = 0
@@ -36,7 +38,8 @@ class ROI:
         self.counts = sum_ - float(bkg_sum_) / float(l) * float(k)
         self.error = np.sqrt(sum_ + float(bkg_sum_) / float(l) * float(k))
         return self.counts, self.error
-        
+
+
 class Sample:
     def __init__(self):
         self.live_time = datetime.timedelta(seconds=0)  # time of sampling
@@ -58,7 +61,7 @@ class Sample:
         self.counts = []
         self.eff_curve = []
 
-    def __add__(self,other):
+    def __add__(self, other):
         self.live_time = self.live_time + other.live_time
         self.real_time = self.real_time + other.real_time
         # self.timestamp
@@ -89,25 +92,25 @@ class Sample:
 
     def set_weather_timestamps(self, weather_time):
         self.weather_timestamps = weather_time
-        
+
     def set_temps(self, temperatures):
         self.temp = temperatures
-        
+
     def set_pressures(self, pres):
         self.pressures = pres
-        
+
     def set_solars(self, solars):
         self.solar = solars
-        
+
     def set_relativehs(self, rhs):
         self.relh = rhs
-        
+
     def set_wind_speeds(self, wind_s):
         self.wind_speed = wind_s
-        
+
     def set_wind_dirs(self, dirs):
         self.wind_dir = dirs
-        
+
     def set_rain(self, rains):
         self.rain = rains
 
@@ -127,7 +130,7 @@ class Sample:
             wind_s[0] = 0
             wind_d = np.zeros(1)
             wind_d[0] = 0
-            
+
         self.set_weather_timestamps(weather_timestamps)
         self.set_temps(np.asarray(temperatures))
         self.set_pressures(np.asarray(pressures))
@@ -158,41 +161,44 @@ class Sample:
 
     def get_timestamp(self):
         return self.timestamp
-        
+
     def get_weather_timestamps(self):
         return self.weather_timestamps
-        
+
     def get_temps(self):
         return self.temp
-        
+
     def get_pressures(self):
         return self.pressures
-        
+
     def get_solars(self):
         return self.solar
-        
+
     def get_relativehs(self):
         return self.relh
-        
+
     def get_wind_speeds(self):
         return self.wind_speed
-        
+
     def get_wind_dirs(self):
         return self.wind_dir
-        
+
     def get_real_time(self):
         return self.real_time
-        
+
     def get_live_time(self):
         return self.live_time
 
     def write_spe(self, out_file_name):
         with open(out_file_name, 'w+') as out_file:
-            out_file.write("$SPEC_ID:\nNo sample description was entered.\n$SPEC_REM:\nDET# 2\nDETDESC# RoofTopBEGE\nAP# GammaVision Version 6.09\n")
+            out_file.write(
+                "$SPEC_ID:\nNo sample description was entered.\n$SPEC_REM:\nDET# 2\nDETDESC# RoofTopBEGE\nAP# GammaVision Version 6.09\n")
             out_file.write("$DATE_MEA:\n")
             tmp_date = self.timestamp
-            mm_dd_yyyy = '%(mm)02d-%(dd)02d-%(yyyy)04d ' + str(tmp_date.hour) + ":" + str(tmp_date.minute) + ":" + str(tmp_date.second)
-            mm_dd_yyyy = mm_dd_yyyy % {"mm": tmp_date.month, "dd": tmp_date.day, "yyyy": float(tmp_date.year), "time": str(tmp_date.hour) + ":" + str(tmp_date.minute) + ":" + str(tmp_date.second)}
+            mm_dd_yyyy = '%(mm)02d-%(dd)02d-%(yyyy)04d ' + str(tmp_date.hour) + \
+                ":" + str(tmp_date.minute) + ":" + str(tmp_date.second)
+            mm_dd_yyyy = mm_dd_yyyy % {"mm": tmp_date.month, "dd": tmp_date.day, "yyyy": float(
+                tmp_date.year), "time": str(tmp_date.hour) + ":" + str(tmp_date.minute) + ":" + str(tmp_date.second)}
             out_file.write(mm_dd_yyyy + "\n")
             out_file.write("$MEAS_TIM:\n")
             out_file.write(str(self.live_time.total_seconds()) + " " + str(self.real_time.total_seconds()) + "\n")
@@ -206,7 +212,7 @@ class Sample:
 
     def write_last_update_image(self, fimage):
         from PIL import Image, ImageDraw, ImageFont
-    
+
         image = Image.new("RGBA", (3000, 240), (255, 255, 255))
         draw = ImageDraw.Draw(image)
         font = ImageFont.truetype("/home/dosenet/etc/fonts/vera_sans/Vera.ttf", 244)
@@ -215,26 +221,27 @@ class Sample:
         image_resized = image.resize((3000, 240), Image.ANTIALIAS)
         image_resized.save(fimage)
 
+
 class SampleCollection:
     def __init__(self):
         self.collection = []
         self.rois = []
         self.eff_curve = []
-        
+
     def __str__(self):
         return str(len(self.collection))
-        
+
     def add_sample(self, sample):
         self.collection.append(sample)
-        
+
     def add_roi(self, file_name):
         import spectra_utils
         self.rois = spectra_utils.parse_roi(file_name)
-        
+
     def set_eff(self, eff_file):
         import spectra_utils
         self.eff_curve = np.asarray(spectra_utils.parse_eff(eff_file))
-        
+
     def get_eff_for_binning(self, energy_bins):
         eff = np.interp(energy_bins, self.eff_curve[:, 0], self.eff_curve[:, 1])
         return eff
@@ -278,8 +285,9 @@ class SampleCollection:
             tmp.relh = np.asarray([y for x in range(p, k) for y in self.collection[x].relh])
             tmp.wind_speed = np.asarray([y for x in range(p, k) for y in self.collection[x].wind_speed])
             tmp.wind_dir = np.asarray([y for x in range(p, k) for y in self.collection[x].wind_dir])
-            if np.abs((self.collection[p].timestamp - self.collection[k-1].timestamp).total_seconds()) > 3600:
-                print("something not right here!!!", p, k, self.collection[p].timestamp, self.collection[k-1].timestamp)
+            if np.abs((self.collection[p].timestamp - self.collection[k - 1].timestamp).total_seconds()) > 3600:
+                print("something not right here!!!", p, k,
+                      self.collection[p].timestamp, self.collection[k - 1].timestamp)
             # print("Counts size: ", np.asarray(tmp.counts).shape)
             tmp.counts = np.asarray([self.collection[x].counts for x in range(p, k)])
             # print("Sum size: ", np.asarray(self.collection[p].counts).shape)
@@ -289,7 +297,7 @@ class SampleCollection:
             co.append(tmp)
         self.collection = []
         self.collection = co
-                
+
     def weighted_mean(self, first, second):
         sum_ = [0, 0]
         # if np.asarray(first).shape[0] == 1 or np.asarray(first).shape[1] == 1:
@@ -349,24 +357,25 @@ class SampleCollection:
                     if not hasattr(sa, 'get_timestamp'):
                         print(f"Error: sample object not properly initialized for {fil}")
                         continue  # Skip this file
-                    
+
                     # Try to match weather data, but continue with empty data if none matches
                     try:
                         if len(list_of_lists[timestamps_index]) > 0:
-                            p = weather_utils.discard_data_before_time(list_of_lists[timestamps_index], sa.get_timestamp(), k)
-                            k = weather_utils.discard_data_before_time(list_of_lists[timestamps_index], 
-                                                                    sa.get_timestamp() + sa.get_real_time(), p)
-                            
+                            p = weather_utils.discard_data_before_time(
+                                list_of_lists[timestamps_index], sa.get_timestamp(), k)
+                            k = weather_utils.discard_data_before_time(list_of_lists[timestamps_index],
+                                                                       sa.get_timestamp() + sa.get_real_time(), p)
+
                             # Check if we have valid indices before accessing weather data
                             if p < k and p < len(list_of_lists[timestamps_index]) and k <= len(list_of_lists[timestamps_index]):
-                                sa.set_weather_params(list_of_lists[timestamps_index][p:k-1], 
-                                                    list_of_lists[temperature_index][p:k-1], 
-                                                    list_of_lists[pres_index][p:k-1], 
-                                                    list_of_lists[sola_index][p:k-1], 
-                                                    list_of_lists[rh_index][p:k-1], 
-                                                    list_of_lists[winds_index][p:k-1], 
-                                                    list_of_lists[windd_index][p:k-1], 
-                                                    list_of_lists[rain_index][p:k-1])
+                                sa.set_weather_params(list_of_lists[timestamps_index][p:k - 1],
+                                                      list_of_lists[temperature_index][p:k - 1],
+                                                      list_of_lists[pres_index][p:k - 1],
+                                                      list_of_lists[sola_index][p:k - 1],
+                                                      list_of_lists[rh_index][p:k - 1],
+                                                      list_of_lists[winds_index][p:k - 1],
+                                                      list_of_lists[windd_index][p:k - 1],
+                                                      list_of_lists[rain_index][p:k - 1])
                             else:
                                 # No matching weather data - use empty arrays
                                 print(f"No matching weather data for file {fil}, using empty weather data")
@@ -379,17 +388,18 @@ class SampleCollection:
                         # Error processing weather data - use empty arrays
                         print(f"Error matching weather data for file {fil}: {e}, using empty weather data")
                         sa.set_weather_params([], [], [], [], [], [], [], [])
-                    
+
                     # Add the sample regardless of weather data
                     self.add_sample(sa)
-                    
+
                 except Exception as e:
                     print(f"Error processing spectral file {fil}: {e}")
                     continue
         else:
             print("Warning: No spectral data files found matching the pattern")
-        
-        print("sample_collection::build_collection: building done")   
+
+        print("sample_collection::build_collection: building done")
+
     def write_hdf(self, file_name):
         print("sample_collection::write_hdf: starting")
         out_file = h5py.File(file_name, 'w')
@@ -401,7 +411,8 @@ class SampleCollection:
         for stmp in self.collection:
             utc_tmsmp = calendar.timegm(stmp.get_timestamp().utctimetuple())
             timstmps.append(utc_tmsmp)
-            specs_meta.append([stmp.real_time.total_seconds(), stmp.live_time.total_seconds(), stmp.bin_cal[0], stmp.bin_cal[1]])
+            specs_meta.append([stmp.real_time.total_seconds(), stmp.live_time.total_seconds(),
+                              stmp.bin_cal[0], stmp.bin_cal[1]])
             specs.append(stmp.counts)
             # print(stmp.get_timestamp())
             # if np.asarray(stmp.wind_speed).shape[0] == 1 or np.asarray(stmp.wind_speed).shape[1] == 1:
@@ -410,7 +421,7 @@ class SampleCollection:
             #     print(stmp.get_timestamp(), ",", np.asarray(stmp.wind_speed).shape[0], np.asarray(stmp.wind_speed).shape[1])
             if stmp.bool_weather_set():
                 weather_el = [np.mean(stmp.temp), np.mean(stmp.pressures), np.mean(stmp.solar), np.mean(stmp.relh),
-                             self.weighted_mean(stmp.wind_speed, stmp.wind_dir), np.mean(stmp.wind_speed), np.sum(stmp.rain)]
+                              self.weighted_mean(stmp.wind_speed, stmp.wind_dir), np.mean(stmp.wind_speed), np.sum(stmp.rain)]
             else:
                 weather_el = np.zeros(7)
                 weather_el[:] = np.NAN
