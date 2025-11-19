@@ -30,6 +30,10 @@ def gather_data():
     # time conversion
     data_frame['Time'] = pd.to_datetime(str(date) + ' ' + data_frame['Time'], format='%Y-%m-%d %I:%M %p')
 
+    # prevent existing data from being added again
+    last_timestamp = get_last_timestamp()
+    data_frame = data_frame[data_frame['Time'] > last_timestamp]
+
     # clean data of units
     measurement_cols = list(set(data_frame.columns) - {'Time'}) # excluding columns for measurement extraction
     data_frame[measurement_cols] = data_frame[measurement_cols].map(get_measurement)
@@ -59,7 +63,7 @@ def assemble(df):
     dict['Battery'] = math.nan
     dict['MinBattery'] = math.nan               # these labels don't seem to correspond with anything
     dict['ETo'] = math.nan
-    dict['Rain Yearly'] = math.nan              # a daily precip. accum. measurement exists
+    dict['Rain Yearly'] = df['Precip. Accum.']              # a daily precip. accum. measurement exists
     dict['Solar Avg'] = df['Solar']             # this in w/m^2, does it require conversion?
     dict['Wind Speed Avg'] = df['Speed']
     dict['Wind Speed Max'] = df['Gust']         # assuming gust = max wind speed
@@ -69,6 +73,13 @@ def assemble(df):
 
     df = pd.DataFrame(dict)
     return df
+
+def get_last_timestamp():       # this determines the datetime of the last entry in the csv.
+    for chunk in pd.read_csv(CSV_PATH, chunksize=1000, usecols=['Date Time']):
+        val = chunk['Date Time'].iloc[-1]
+        if val is not None:
+            out = val
+    return pd.Timestamp(out)
 
 if(__name__=='__main__'):
     gather_data()
