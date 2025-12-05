@@ -3,7 +3,7 @@ import pandas as pd
 import datetime
 import math
 
-CSV_PATH = '/home/dosenet/radwatch-airmonitor/Dropbox/UCB Air Monitor/Data/Weather/weatherhawk.csv'
+CSV_PATH = '/home/dosenet/radwatch-airmonitor/weatherhawk.csv'
 
 NSEW_TO_DEG = {'N':180,'S':0,'E':270,'W':90,
                'North':180,'South':0,'East':270,'West':90,

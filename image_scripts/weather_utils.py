@@ -180,19 +180,25 @@ def parse_weather_data(f_name):
                     list_of_lists[k].append(date_obj)
                 elif k == 12:
                     # first rain sample or rain data reset.
-                    tmp = float(row[order[k]])
-                    if index == 0:
-                        prev_rain_sample = tmp
-                        list_of_lists[k].append(0.)
+                    if row[order[k]] == '':
+                        prev_rain_sample = 0
                     else:
-                        if float(row[order[k]]) - prev_rain_sample > 0:
-                            list_of_lists[k].append(float(row[order[k]]) - prev_rain_sample)
-                            prev_rain_sample = float(row[order[k]])
+                        tmp = float(row[order[k]])
+                        if index == 0:
+                            prev_rain_sample = tmp
+                            list_of_lists[k].append(0.)
                         else:
-                            list_of_lists[k].append(0)
-                        if float(row[order[k]]) == 0:
-                            prev_rain_sample = 0
+                            if float(row[order[k]]) - prev_rain_sample > 0:
+                                list_of_lists[k].append(float(row[order[k]]) - prev_rain_sample)
+                                prev_rain_sample = float(row[order[k]])
+                            else:
+                                list_of_lists[k].append(0)
+                            if float(row[order[k]]) == 0:
+                                prev_rain_sample = 0
                 else:
-                    list_of_lists[k].append(float(row[order[k]]))
+                    if row[order[k]] == '':
+                        list_of_lists[k].append(0.0)
+                    else:
+                        list_of_lists[k].append(float(row[order[k]]))
     
     return list_of_lists, units, label, is_time_str, order

@@ -218,7 +218,16 @@ class Sample:
         font = ImageFont.truetype("/home/dosenet/etc/fonts/vera_sans/Vera.ttf", 244)
 
         draw.text((0, 0), self.timestamp.strftime("%a, %b %d at %I:%M%p"), (0, 0, 0), font=font)
-        image_resized = image.resize((3000, 240), Image.ANTIALIAS)
+
+        # Use LANCZOS for compatibility with both old and new Pillow versions
+        try:
+            # Pillow >= 10.0.0
+            from PIL.Image import Resampling
+            image_resized = image.resize((3000, 240), Resampling.LANCZOS)
+        except (ImportError, AttributeError):
+            # Pillow < 10.0.0
+            image_resized = image.resize((3000, 240), Image.LANCZOS)
+        #image_resized = image.resize((3000, 240), Image.ANTIALIAS)
         image_resized.save(fimage)
 
 
@@ -234,6 +243,7 @@ class SampleCollection:
     def add_sample(self, sample):
         self.collection.append(sample)
 
+
     def add_roi(self, file_name):
         import spectra_utils
         self.rois = spectra_utils.parse_roi(file_name)
@@ -245,6 +255,37 @@ class SampleCollection:
     def get_eff_for_binning(self, energy_bins):
         eff = np.interp(energy_bins, self.eff_curve[:, 0], self.eff_curve[:, 1])
         return eff
+
+    def standardize_channel_counts(self):
+        """After building collection, standardize all samples to a common channel count"""
+        from collections import Counter
+        
+        # Find all unique channel counts
+        channel_counts = [len(s.counts) for s in self.collection]
+        count_distribution = Counter(channel_counts)
+        print(f"Channel count distribution: {dict(count_distribution)}")
+        
+        # Use the MINIMUM common count (prefer downsampling over upsampling)
+        target_count = min(count_distribution.keys())
+        print(f"Standardizing all samples to {target_count} channels (downsampling preferred)")
+        
+        new_collection = []
+        for sample in self.collection:
+            if len(sample.counts) == target_count:
+                new_collection.append(sample)
+            elif len(sample.counts) % target_count == 0:
+                # Downsample by summing bins
+                factor = len(sample.counts) // target_count
+                sample.counts = np.asarray(sample.counts).reshape(-1, factor).sum(axis=1)
+                if hasattr(sample, 'bin_cal'):
+                    sample.bin_cal[1] *= factor  # Adjust keV/channel
+                new_collection.append(sample)
+                print(f"Downsampled {len(sample.counts)*factor} → {target_count} at {sample.timestamp}")
+            else:
+                print(f"Warning: Cannot convert {len(sample.counts)} channels to {target_count}, skipping sample at {sample.timestamp}")
+        
+        self.collection = new_collection
+        print(f"Standardized to {len(self.collection)} samples with {target_count} channels")
 
     def rebin(self, delta_t):
         print("first step in rebin")
