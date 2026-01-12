@@ -441,6 +441,8 @@ class SampleCollection:
 
         print("sample_collection::build_collection: building done")
 
+
+'''
     def write_hdf(self, file_name):
         print("sample_collection::write_hdf: starting")
         out_file = h5py.File(file_name, 'w')
@@ -471,3 +473,245 @@ class SampleCollection:
         ths_yr.create_dataset('spectra', data=specs, dtype=np.dtype('uint32'))
         ths_yr.create_dataset('weather_data', data=weather_list, dtype=float)
         ths_yr.create_dataset('spectra_meta', data=specs_meta, dtype=float)
+'''
+
+
+    def write_hdf(self, file_name):
+        """Write collection to HDF5 file using generic 'data' group"""
+        print("sample_collection::write_hdf: starting")
+        out_file = h5py.File(file_name, 'w')
+        
+        # Use 'data' instead of hardcoded year
+        data_group = out_file.create_group('data')
+        
+        timstmps = []
+        specs = []
+        weather_list = []
+        specs_meta = []
+        
+        for stmp in self.collection:
+            utc_tmsmp = calendar.timegm(stmp.get_timestamp().utctimetuple())
+            timstmps.append(utc_tmsmp)
+            specs_meta.append([stmp.real_time.total_seconds(), stmp.live_time.total_seconds(),
+                              stmp.bin_cal[0], stmp.bin_cal[1]])
+            specs.append(stmp.counts)
+            
+            if stmp.bool_weather_set():
+                weather_el = [np.mean(stmp.temp), np.mean(stmp.pressures), np.mean(stmp.solar), np.mean(stmp.relh),
+                              self.weighted_mean(stmp.wind_speed, stmp.wind_dir), np.mean(stmp.wind_speed), np.sum(stmp.rain)]
+            else:
+                weather_el = np.zeros(7)
+                weather_el[:] = np.NAN
+            weather_list.append(weather_el)
+        
+        data_group.create_dataset('timestamps', data=timstmps, dtype=np.dtype('uint32'))
+        data_group.create_dataset('spectra', data=specs, dtype=np.dtype('uint32'))
+        data_group.create_dataset('weather_data', data=weather_list, dtype=float)
+        data_group.create_dataset('spectra_meta', data=specs_meta, dtype=float)
+        
+        out_file.close()
+        print("sample_collection::write_hdf: complete")
+
+    def read_hdf(self, file_name):
+        """Load collection from HDF5 file"""
+        print(f"sample_collection::read_hdf: loading from {file_name}")
+        
+        if not os.path.exists(file_name):
+            print(f"HDF5 file {file_name} does not exist, starting fresh")
+            return False
+        
+        try:
+            in_file = h5py.File(file_name, 'r')
+            
+            # Try to read from the '2014' group (the hardcoded year in write_hdf)
+            if '2014' in in_file:
+                data_group = in_file['2014']
+            else:
+                # Fallback to first available group
+                data_group = in_file[list(in_file.keys())[0]]
+            
+            timestamps = data_group['timestamps'][:]
+            spectra = data_group['spectra'][:]
+            weather_data = data_group['weather_data'][:]
+            spectra_meta = data_group['spectra_meta'][:]
+            
+            in_file.close()
+            
+            print(f"Loaded {len(timestamps)} samples from HDF5")
+            
+            # Reconstruct Sample objects from the HDF5 data
+            for i in range(len(timestamps)):
+                sample = Sample()
+                
+                # Convert UTC timestamp back to datetime
+                sample.timestamp = datetime.datetime.utcfromtimestamp(timestamps[i]).replace(tzinfo=datetime.timezone.utc)
+                
+                # Set spectra data
+                sample.real_time = datetime.timedelta(seconds=spectra_meta[i][0])
+                sample.live_time = datetime.timedelta(seconds=spectra_meta[i][1])
+                sample.bin_cal = np.array([spectra_meta[i][2], spectra_meta[i][3]])
+                sample.counts = spectra[i]
+                
+                # Reconstruct bin_lim (assuming it spans the full range)
+                sample.bin_lim = np.array([0, len(spectra[i]) - 1])
+                
+                # Set weather data (these are already averaged in the HDF5)
+                # Store as single-element arrays to match the expected format
+                if not np.isnan(weather_data[i][0]):
+                    sample.temp = np.array([weather_data[i][0]])
+                    sample.pressures = np.array([weather_data[i][1]])
+                    sample.solar = np.array([weather_data[i][2]])
+                    sample.relh = np.array([weather_data[i][3]])
+                    sample.wind_dir = np.array([weather_data[i][4]])  # weighted mean direction
+                    sample.wind_speed = np.array([weather_data[i][5]])
+                    sample.rain = np.array([weather_data[i][6]])
+                    sample.weather_timestamps = np.array([timestamps[i]])
+                else:
+                    # No weather data
+                    sample.weather_timestamps = np.zeros(0)
+                    sample.temp = np.zeros(0)
+                    sample.pressures = np.zeros(0)
+                    sample.solar = np.zeros(0)
+                    sample.relh = np.zeros(0)
+                    sample.wind_speed = np.zeros(0)
+                    sample.wind_dir = np.zeros(0)
+                    sample.rain = np.zeros(0)
+                
+                self.collection.append(sample)
+            
+            print(f"Successfully loaded {len(self.collection)} samples")
+            return True
+            
+        except Exception as e:
+            print(f"Error reading HDF5 file: {e}")
+            return False
+
+
+    def build_collection_incremental(self, spec_dir, weather_csv, last_processed_marker='last_processed.txt'):
+        """Build collection only from new files since last run"""
+        import spectra_utils
+        
+        print(f"Looking for spectral files in: {spec_dir}")
+        if not os.path.exists(spec_dir):
+            print(f"ERROR: Spectral directory does not exist: {spec_dir}")
+            return
+        
+        # Weather data indices
+        timestamps_index = 1
+        temperature_index = 2
+        rh_index = 7
+        pres_index = 8
+        rain_index = 12
+        sola_index = 13
+        winds_index = 17
+        windd_index = 18
+        
+        print(f"Parsing weather data from: {weather_csv}")
+        list_of_lists, units, label, is_time_str, order = weather_utils.parse_weather_data(weather_csv)
+        print(f"Found {len(list_of_lists[timestamps_index])} weather data points")
+        
+        file_pattern = spec_dir + '*/*.CNF'
+        print(f"Searching for files matching pattern: {file_pattern}")
+        fil_list = glob.glob(file_pattern)
+        print(f"Found {len(fil_list)} spectral files")
+        fil_list.sort()
+        
+        # Determine starting point based on last processed file
+        start_index = 0
+        if os.path.exists(last_processed_marker):
+            with open(last_processed_marker, 'r') as f:
+                last_file = f.read().strip()
+                print(f"Last processed file: {last_file}")
+                if last_file in fil_list:
+                    start_index = fil_list.index(last_file) + 1
+                    print(f"Resuming from file index {start_index}")
+                else:
+                    print(f"Last processed file not found in current file list, starting from beginning")
+        else:
+            print(f"No last processed marker found, processing recent files")
+            # Default to last 10000 files if no marker exists
+            start_index = max(0, len(fil_list) - 10000)
+        
+        end_index = len(fil_list)
+        
+        if start_index >= end_index:
+            print(f"No new files to process (start_index={start_index}, end_index={end_index})")
+            return
+        
+        print(f"Processing files {start_index} to {end_index} ({end_index - start_index} new files)")
+        
+        files_processed = 0
+        for fi in range(start_index, end_index):
+            fil = fil_list[fi]
+            try:
+                if files_processed % 100 == 0:
+                    print(f"Processing file {fi}/{end_index}: {fil}")
+                
+                k = 0
+                sa = Sample()
+                sa = spectra_utils.parse_spectra(fil, sa)
+                
+                if not hasattr(sa, 'get_timestamp'):
+                    print(f"Error: sample object not properly initialized for {fil}")
+                    continue
+                
+                # Match weather data
+                try:
+                    if len(list_of_lists[timestamps_index]) > 0:
+                        p = weather_utils.discard_data_before_time(
+                            list_of_lists[timestamps_index], sa.get_timestamp(), k)
+                        k = weather_utils.discard_data_before_time(list_of_lists[timestamps_index],
+                                                                   sa.get_timestamp() + sa.get_real_time(), p)
+                        
+                        if p < k and p < len(list_of_lists[timestamps_index]) and k <= len(list_of_lists[timestamps_index]):
+                            sa.set_weather_params(list_of_lists[timestamps_index][p:k - 1],
+                                                  list_of_lists[temperature_index][p:k - 1],
+                                                  list_of_lists[pres_index][p:k - 1],
+                                                  list_of_lists[sola_index][p:k - 1],
+                                                  list_of_lists[rh_index][p:k - 1],
+                                                  list_of_lists[winds_index][p:k - 1],
+                                                  list_of_lists[windd_index][p:k - 1],
+                                                  list_of_lists[rain_index][p:k - 1])
+                        else:
+                            sa.set_weather_params([], [], [], [], [], [], [], [])
+                    else:
+                        sa.set_weather_params([], [], [], [], [], [], [], [])
+                except Exception as e:
+                    print(f"Error matching weather data for file {fil}: {e}")
+                    sa.set_weather_params([], [], [], [], [], [], [], [])
+                
+                self.add_sample(sa)
+                files_processed += 1
+                
+            except Exception as e:
+                print(f"Error processing spectral file {fil}: {e}")
+                continue
+        
+        print(f"sample_collection::build_collection_incremental: processed {files_processed} new files")
+        
+        # Save the last processed file marker
+        if len(fil_list) > 0:
+            with open(last_processed_marker, 'w') as f:
+                f.write(fil_list[-1])
+            print(f"Updated last processed marker to: {fil_list[-1]}")
+
+
+    def merge_collection(self, other_collection):
+        """Merge another collection into this one, avoiding duplicates based on timestamp"""
+        print(f"Merging collections: current={len(self.collection)}, new={len(other_collection.collection)}")
+        
+        # Get existing timestamps for duplicate detection
+        existing_timestamps = {sample.timestamp for sample in self.collection}
+        
+        added_count = 0
+        for sample in other_collection.collection:
+            if sample.timestamp not in existing_timestamps:
+                self.collection.append(sample)
+                existing_timestamps.add(sample.timestamp)
+                added_count += 1
+        
+        # Sort by timestamp after merging
+        self.collection.sort(key=lambda x: x.timestamp)
+        
+        print(f"Merged {added_count} new samples, total now: {len(self.collection)}")
+        return added_count

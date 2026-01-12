@@ -9,6 +9,8 @@ import time
 import sys
 import os
 import numpy as np  # Adding numpy import that was implied but not explicit
+sys.path.insert(0, '/home/dosenet/radwatch-airmonitor/')
+sys.path.insert(0, '/home/dosenet/radwatch-airmonitor/image_scripts')
 sys.path.insert(0, '..')
 sys.path.insert(0, '.')
 sys.path.insert(0, '../..')
@@ -50,29 +52,63 @@ col_pal = ['#00B2A5',
 
 # get the data
 file = h5py.File('./rebin.h5', 'r')
-tmstmps = file['/2014/timestamps']
-tm_meta = file['/2014/spectra_meta']
-spectra = file['/2014/spectra']
+
+# FIXED: Support both 'data' group (new) and legacy year groups (e.g., '2014')
+if 'data' in file:
+    data_group = file['data']
+    print("Loading from 'data' group")
+else:
+    # Legacy support
+    available_groups = list(file.keys())
+    if len(available_groups) == 0:
+        print("ERROR: No data groups found in HDF5 file")
+        sys.exit(1)
+    data_group = file[available_groups[0]]
+    print(f"Loading from legacy group '{available_groups[0]}'")
+
+tmstmps = data_group['timestamps']
+tm_meta = data_group['spectra_meta']
+spectra = data_group['spectra']
 print(spectra)
-cals = file['/2014/spectra_meta']
-weather = file['/2014/weather_data']
-s = [len(spectra[:, 1]), len(spectra[1, :])]
+cals = data_group['spectra_meta']
+weather = data_group['weather_data']
+
+
+# FIXED: Use proper shape access
+s = spectra.shape
 print('spectra shape', s)
 print(os.getcwd())
+
+# Check we have data
+if s[0] == 0:
+    print("ERROR: No spectra in HDF5 file")
+    sys.exit(1)
+
+# Check weather data shape
+print(f"Weather data shape: {weather.shape}")
+if weather.shape[1] < 7:
+    print("ERROR: Weather data doesn't have expected number of columns")
+    sys.exit(1)
 
 ax = []
 spec = spectra[-1, :]
 # print("comment the line after this in order to get 1hr spec")
 # spec = np.sum(spectra[:300, :], axis=0)
 
+# FIXED: energy axis generation using last sample's calibration
+#last_cal = cals[-1]  # Get calibration for most recent spectrum
+
 # energy axis generation
 for x in range(0, len(spec)):
     ax.append((x+1)*cals[1, 3]+cals[1, 2])
+
 col = sample_collection.SampleCollection()
 col_comp = sample_collection.SampleCollection()
 col.add_roi('/home/dosenet/radwatch-airmonitor/image_scripts/analysis/roi_simple.dat')
 col.set_eff('/home/dosenet/radwatch-airmonitor/image_scripts/analysis/roof.ecc')
 col_comp.add_roi('/home/dosenet/radwatch-airmonitor/image_scripts/analysis/roi.dat')
+
+
 
 #eff=col.get_eff_for_binning(ax); 
 #for x in range(0,len(spec)):
