@@ -417,3 +417,36 @@ def parse_eff(file_name):
         tmp = [float(tmp_str[0]), float(tmp_str[1]), float(tmp_str[2]), float(tmp_str[3])]
         eff.append(tmp)
     return eff
+
+def parse_roi(file_name):
+    # This function doesn't use xylib, so it remains unchanged.
+    # Import only when needed to avoid circular dependency
+    import sample_collection
+
+    roi_col = []
+    with open(file_name) as roi_file:
+        content = roi_file.readlines()
+    
+    k = 0
+    while k < len(content) - 1:
+        bkg = []
+        if k == 0:
+            while not ('$ROI' in content[k]):
+                k = k + 1
+        k = k + 1
+        sp_line = content[k].split(" ")
+        iso = sp_line[3]
+        energy = sp_line[4]
+        origin = sp_line[5]
+        spec_roi = [int(sp_line[1]), int(sp_line[2])]
+        for x in range(0, int(sp_line[0])):
+            k = k + 1
+            sp_line = content[k].split(" ")
+            bkg.append([int(sp_line[1]), int(sp_line[2])])
+        r = sample_collection.ROI(spec_roi, bkg)
+        r.origin = origin.replace('\n', '').replace("_", " ")
+        r.isotope = iso.replace('\n', '')
+        r.energy = float(energy.split('k')[0])
+        roi_col.append(r)
+    
+    return roi_col

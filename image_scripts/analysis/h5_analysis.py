@@ -121,7 +121,9 @@ col_comp.add_roi('/home/dosenet/radwatch-airmonitor/image_scripts/analysis/roi.d
 res = np.zeros((len(col.rois), 2))
 k = 0
 for el in col.rois:
-    res[k, :] = el.get_counts(spec)
+    counts = el.get_counts(spec)
+    print(f"get_counts output: {counts}")
+    res[k, :] = counts
     k += 1
 
 #printing rois
@@ -133,15 +135,20 @@ for el in col.rois:
     roi_[el.peak[0]:el.peak[1]] = spec[el.peak[0]:el.peak[1]]
 for el in col_comp.rois:
     roi_comp[el.peak[0]:el.peak[1]] = spec[el.peak[0]:el.peak[1]]
-    super_tmp = el.peak[0] + np.argmax(spec[el.peak[0]:el.peak[1]])
-    if el.peak[0] - lst_peak < 100:
-        if lst_peak_height + 25 > spec[super_tmp]:
-            shift = 120 * max([lst_peak_height, spec[super_tmp]]) / (min([lst_peak_height, spec[super_tmp]]))
-            shift = min([150, shift])
-            print(el.isotope, lst_peak_height, lst_peak, spec[super_tmp], el.peak[0])
+    try:
+        super_tmp = el.peak[0] + np.argmax(spec[el.peak[0]:el.peak[1]])
+        if el.peak[0] - lst_peak < 100:
+            if lst_peak_height + 25 > spec[super_tmp]:
+                shift = 120 * max([lst_peak_height, spec[super_tmp]]) / (min([lst_peak_height, spec[super_tmp]]))
+                shift = min([150, shift])
+                print(el.isotope, lst_peak_height, lst_peak, spec[super_tmp], el.peak[0])
+            else:
+                shift = 80
         else:
             shift = 80
-    else:
+    except Exception as e:
+        print(e)
+        print(f"Spectrum object: {el}")
         shift = 80
     annotate(el.isotope, (ax[super_tmp], spec[super_tmp]), xytext=(0, shift), textcoords='offset points', rotation=90, 
              ha='center', va='center', arrowprops=dict(width=0.25, headwidth=0, shrink=0.05))

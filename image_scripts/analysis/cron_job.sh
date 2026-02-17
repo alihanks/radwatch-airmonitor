@@ -19,9 +19,9 @@ date;
 
 cd /home/dosenet/radwatch-airmonitor/image_scripts/analysis/
 pwd > /home/dosenet/radwatch-airmonitor/image_scripts/analysis/out.txt
-#python /home/dosenet/radwatch-airmonitor/image_scripts/weather_gatherer.py
-python /home/dosenet/radwatch-airmonitor/image_scripts/analysis/raw_analysis.py
-python /home/dosenet/radwatch-airmonitor/image_scripts/analysis/h5_analysis.py
+python3 /home/dosenet/radwatch-airmonitor/image_scripts/weather_gatherer.py
+python3 /home/dosenet/radwatch-airmonitor/image_scripts/analysis/raw_analysis.py
+python3 /home/dosenet/radwatch-airmonitor/image_scripts/analysis/h5_analysis.py
 #python /home/dosenet/radwatch-airmonitor/image_scripts/analysis/stage_h5.py
 convert -geometry 300x220+0+0 iso_One_Day.png iso_One_Day_small.png
 mkdir rooftop_tmp

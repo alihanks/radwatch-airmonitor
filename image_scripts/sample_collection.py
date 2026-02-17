@@ -21,7 +21,7 @@ class ROI:
         self.origin = ''
         self.counts = []
         self.energy = []
-        self.errors = []
+        self.error = []
 
     def get_counts(self, spec):
         sum_ = 0
@@ -35,8 +35,13 @@ class ROI:
             for p in spec[bkg_el[0]:bkg_el[1]]:
                 l += 1
                 bkg_sum_ += p
-        self.counts = sum_ - float(bkg_sum_) / float(l) * float(k)
-        self.error = np.sqrt(sum_ + float(bkg_sum_) / float(l) * float(k))
+        if l != 0:
+            self.counts = sum_ - float(bkg_sum_) / float(l) * float(k)
+            self.error = np.sqrt(sum_ + float(bkg_sum_) / float(l) * float(k))
+        else:
+            self.counts = 0
+            self.error = 0
+        print(f"Counts Array: {self.counts}")
         return self.counts, self.error
 
 
@@ -442,38 +447,38 @@ class SampleCollection:
         print("sample_collection::build_collection: building done")
 
 
-'''
-    def write_hdf(self, file_name):
-        print("sample_collection::write_hdf: starting")
-        out_file = h5py.File(file_name, 'w')
-        ths_yr = out_file.create_group('2014')
-        timstmps = []
-        specs = []
-        weather_list = []
-        specs_meta = []  # weather_el = np.zeros(5)
-        for stmp in self.collection:
-            utc_tmsmp = calendar.timegm(stmp.get_timestamp().utctimetuple())
-            timstmps.append(utc_tmsmp)
-            specs_meta.append([stmp.real_time.total_seconds(), stmp.live_time.total_seconds(),
-                              stmp.bin_cal[0], stmp.bin_cal[1]])
-            specs.append(stmp.counts)
-            # print(stmp.get_timestamp())
-            # if np.asarray(stmp.wind_speed).shape[0] == 1 or np.asarray(stmp.wind_speed).shape[1] == 1:
-            #     pass
-            # else:
-            #     print(stmp.get_timestamp(), ",", np.asarray(stmp.wind_speed).shape[0], np.asarray(stmp.wind_speed).shape[1])
-            if stmp.bool_weather_set():
-                weather_el = [np.mean(stmp.temp), np.mean(stmp.pressures), np.mean(stmp.solar), np.mean(stmp.relh),
-                              self.weighted_mean(stmp.wind_speed, stmp.wind_dir), np.mean(stmp.wind_speed), np.sum(stmp.rain)]
-            else:
-                weather_el = np.zeros(7)
-                weather_el[:] = np.NAN
-            weather_list.append(weather_el)
-        ths_yr.create_dataset('timestamps', data=timstmps, dtype=np.dtype('uint32'))
-        ths_yr.create_dataset('spectra', data=specs, dtype=np.dtype('uint32'))
-        ths_yr.create_dataset('weather_data', data=weather_list, dtype=float)
-        ths_yr.create_dataset('spectra_meta', data=specs_meta, dtype=float)
-'''
+    '''
+        def write_hdf(self, file_name):
+            print("sample_collection::write_hdf: starting")
+            out_file = h5py.File(file_name, 'w')
+            ths_yr = out_file.create_group('2014')
+            timstmps = []
+            specs = []
+            weather_list = []
+            specs_meta = []  # weather_el = np.zeros(5)
+            for stmp in self.collection:
+                utc_tmsmp = calendar.timegm(stmp.get_timestamp().utctimetuple())
+                timstmps.append(utc_tmsmp)
+                specs_meta.append([stmp.real_time.total_seconds(), stmp.live_time.total_seconds(),
+                                  stmp.bin_cal[0], stmp.bin_cal[1]])
+                specs.append(stmp.counts)
+                # print(stmp.get_timestamp())
+                # if np.asarray(stmp.wind_speed).shape[0] == 1 or np.asarray(stmp.wind_speed).shape[1] == 1:
+                #     pass
+                # else:
+                #     print(stmp.get_timestamp(), ",", np.asarray(stmp.wind_speed).shape[0], np.asarray(stmp.wind_speed).shape[1])
+                if stmp.bool_weather_set():
+                    weather_el = [np.mean(stmp.temp), np.mean(stmp.pressures), np.mean(stmp.solar), np.mean(stmp.relh),
+                                  self.weighted_mean(stmp.wind_speed, stmp.wind_dir), np.mean(stmp.wind_speed), np.sum(stmp.rain)]
+                else:
+                    weather_el = np.zeros(7)
+                    weather_el[:] = np.NAN
+                weather_list.append(weather_el)
+            ths_yr.create_dataset('timestamps', data=timstmps, dtype=np.dtype('uint32'))
+            ths_yr.create_dataset('spectra', data=specs, dtype=np.dtype('uint32'))
+            ths_yr.create_dataset('weather_data', data=weather_list, dtype=float)
+            ths_yr.create_dataset('spectra_meta', data=specs_meta, dtype=float)
+    '''
 
 
     def write_hdf(self, file_name):

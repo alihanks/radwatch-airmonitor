@@ -12,6 +12,7 @@ sys.path.insert(0, '../windrose')
 sys.path.insert(0, '..')
 from windrose import WindroseAxes
 import sample_collection
+import pytz
 
 def resort_weather_timestamps(in_file,out_file):
     with open(in_file) as fil:
@@ -53,7 +54,7 @@ def parse_date_to_struct(datetime_str):
     date_array = date_str.split("-")
     time_array = time_str.split(":")    
     return datetime.datetime(int(date_array[0]), int(date_array[1]), int(date_array[2]), 
-                            int(time_array[0]), int(time_array[1]), int(time_array[2]))
+                            int(time_array[0]), int(time_array[1]), int(time_array[2]), tzinfo=pytz.timezone('US/Pacific'))
 
 def get_units_label(order):
     unit_list = []
@@ -113,7 +114,7 @@ def rebin(x,y,win_str,win_time):
 def new_axes():
     fig = figure(figsize=(8, 8), dpi=80, facecolor='w', edgecolor='w')
     rect = [0.1, 0.1, 0.8, 0.8]
-    ax = WindroseAxes(fig, rect, axisbg='w')
+    ax = WindroseAxes(fig, rect, facecolor='w')
     fig.add_axes(ax)
     return ax
 
