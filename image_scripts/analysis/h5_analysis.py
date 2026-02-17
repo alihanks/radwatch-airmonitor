@@ -250,7 +250,7 @@ with open('weather.csv', 'w') as out_file, open('weather_bq.csv', 'w') as out_fi
 
     mins = np.argmin(roi_array[:, :, 0], axis=0)
     print(mins)
-    for x in range(len(timestamps) - 15 * 24, len(timestamps)):
+    for x in range(max(0, len(timestamps) - 15 * 24), len(timestamps)):
         out_str = str(timestamps[x])
         out_str_bq = str(timestamps[x])
         for y in range(0, len(roi_array[x, :, 0])):
@@ -315,9 +315,8 @@ for x in time_utils.time_wins:
 # tmp plot of rainfall
 clf()
 # make cummulative sum
-cum_sum = np.zeros(len(weather[:, 6]))
-for x in range(1, len(weather[:, 6])):
-    cum_sum[x] = cum_sum[x-1] + weather[x, 6]
+rain_data = np.nan_to_num(weather[:, 6], nan=0.0)
+cum_sum = np.cumsum(rain_data)
 # plot(timestamps, weather[:, 6])
 plot(timestamps, cum_sum)
 savefig('out.png')
