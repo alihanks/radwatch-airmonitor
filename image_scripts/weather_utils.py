@@ -183,6 +183,7 @@ def parse_weather_data(f_name):
                     # first rain sample or rain data reset.
                     if row[order[k]] == '':
                         prev_rain_sample = 0
+                        list_of_lists[k].append(0.0)
                     else:
                         tmp = float(row[order[k]])
                         if index == 0:
