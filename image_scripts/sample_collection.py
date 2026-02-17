@@ -537,6 +537,13 @@ class SampleCollection:
                 # Fallback to first available group
                 data_group = in_file[list(in_file.keys())[0]]
             
+            required_datasets = ['timestamps', 'spectra', 'weather_data', 'spectra_meta']
+            for ds in required_datasets:
+                if ds not in data_group:
+                    print(f"HDF5 data group is empty (missing '{ds}'), starting fresh")
+                    in_file.close()
+                    return False
+
             timestamps = data_group['timestamps'][:]
             spectra = data_group['spectra'][:]
             weather_data = data_group['weather_data'][:]

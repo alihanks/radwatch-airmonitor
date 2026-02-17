@@ -66,6 +66,13 @@ else:
     data_group = file[available_groups[0]]
     print(f"Loading from legacy group '{available_groups[0]}'")
 
+required_datasets = ['timestamps', 'spectra_meta', 'spectra', 'weather_data']
+for ds in required_datasets:
+    if ds not in data_group:
+        print(f"ERROR: Required dataset '{ds}' not found in HDF5 file. The data group is empty.")
+        print("This likely means no spectral files were processed. Check that the spectral data directory exists.")
+        sys.exit(1)
+
 tmstmps = data_group['timestamps']
 tm_meta = data_group['spectra_meta']
 spectra = data_group['spectra']
