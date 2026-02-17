@@ -1,1 +1,10 @@
 /home/dosenet/radwatch-airmonitor/image_scripts/analysis
+SHELL=/bin/bash
+PWD=/home/dosenet/radwatch-airmonitor/image_scripts/analysis
+LOGNAME=dosenet/radwatch-airmonitor
+HOME=/home/dosenet/radwatch-airmonitor
+LANG=en_US.UTF-8
+SHLVL=1
+PATH=/home/dosenet/anaconda3/bin:/home/dosenet/anaconda3/condabin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/games:/usr/local/games:/snap/bin:/snap/bin
+_=/usr/bin/env
+OLDPWD=/home/dosenet/radwatch-airmonitor

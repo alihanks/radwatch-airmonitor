@@ -472,7 +472,7 @@ class SampleCollection:
                                   self.weighted_mean(stmp.wind_speed, stmp.wind_dir), np.mean(stmp.wind_speed), np.sum(stmp.rain)]
                 else:
                     weather_el = np.zeros(7)
-                    weather_el[:] = np.NAN
+                    weather_el[:] = np.nan
                 weather_list.append(weather_el)
             ths_yr.create_dataset('timestamps', data=timstmps, dtype=np.dtype('uint32'))
             ths_yr.create_dataset('spectra', data=specs, dtype=np.dtype('uint32'))
@@ -506,7 +506,7 @@ class SampleCollection:
                               self.weighted_mean(stmp.wind_speed, stmp.wind_dir), np.mean(stmp.wind_speed), np.sum(stmp.rain)]
             else:
                 weather_el = np.zeros(7)
-                weather_el[:] = np.NAN
+                weather_el[:] = np.nan
             weather_list.append(weather_el)
         
         data_group.create_dataset('timestamps', data=timstmps, dtype=np.dtype('uint32'))
