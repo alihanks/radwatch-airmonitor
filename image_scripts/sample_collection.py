@@ -41,7 +41,7 @@ class ROI:
         else:
             self.counts = 0
             self.error = 0
-        print(f"Counts Array: {self.counts}")
+        #print(f"Counts Array: {self.counts}")
         return self.counts, self.error
 
 

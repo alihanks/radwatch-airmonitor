@@ -10,12 +10,12 @@ from image_scripts import sample_collection
 import datetime
 
 spec_dir = r'/home/dosenet/Dropbox/UCB Air Monitor/Data/Roof/current/'
-weat_csv = r'/home/dosenet/radwatch-airmonitor/weatherhawk.csv'
+weat_csv = r'/home/dosenet/radwatch-airmonitor/image_scripts/analysis/weather.csv'
 weat_csv_sorted = r'weather_sorted.csv'
 roi_dat = r'/home/dosenet/radwatch-airmonitor/image_scripts/analysis/roi.dat'
 
-#weather_utils.resort_weather_timestamps(weat_csv, weat_csv_sorted)
-#print("resorted the weather data")
+weather_utils.resort_weather_timestamps(weat_csv, weat_csv_sorted)
+print("resorted the weather data")
 #col = sample_collection.SampleCollection()
 #print("Collection made")
 #col.build_collection(spec_dir, weat_csv_sorted)
