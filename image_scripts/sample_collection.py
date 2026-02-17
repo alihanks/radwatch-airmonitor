@@ -528,8 +528,10 @@ class SampleCollection:
         try:
             in_file = h5py.File(file_name, 'r')
             
-            # Try to read from the '2014' group (the hardcoded year in write_hdf)
-            if '2014' in in_file:
+            # Try to read from the 'data' group (current format), fall back to '2014' (legacy)
+            if 'data' in in_file:
+                data_group = in_file['data']
+            elif '2014' in in_file:
                 data_group = in_file['2014']
             else:
                 # Fallback to first available group
