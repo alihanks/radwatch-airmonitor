@@ -231,7 +231,12 @@ for x in range(0, s[0]):
         k += 1
     roi_array[x, :, :] = tmp
 
-       
+# Replace invalid data points with NaN so plots show gaps instead of zeros
+for x in range(0, s[0]):
+    if tm_meta[x, 1] <= 0 or np.sum(spectra[x, :]) == 0:
+        roi_array[x, :, :] = np.nan
+
+
 #plot all isotopes
 #gs=matplotlib.gridspec.GridSpec(2,1,height_ratios=[1,3]);
 axarr = [subplot2grid((5, 4), (0, 0), colspan=4), subplot2grid((5, 4), (1, 0), rowspan=3, colspan=4), 

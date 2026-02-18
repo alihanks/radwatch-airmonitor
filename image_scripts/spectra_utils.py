@@ -98,7 +98,7 @@ def parse_spectra(file_name, sample, format_hint: str = ""):
         data = read_cnf(str(path), verbose=False)
 
         # Load external calibration
-        cal_path = Path('/home/dosenet/radwatch-airmonitor/calibration_coefficients.txt')
+        cal_path = Path('/home/dosenet/radwatch-airmonitor/image_scripts/calibration/calibration_coefficients.txt')
         if cal_path.exists():
             cal = read_calibration_file(str(cal_path))
         else:
