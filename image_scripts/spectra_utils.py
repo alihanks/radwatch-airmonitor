@@ -418,6 +418,58 @@ def parse_eff(file_name):
         eff.append(tmp)
     return eff
 
+def parse_roi_energy(file_name, calibration):
+    """Parse energy-based ROI file ($ROI_ENERGY: format). Converts keV windows
+    to channels using the given calibration. Returns list of ROI objects."""
+    import sample_collection
+    from spectrum_calibration import energy_to_channel
+
+    roi_col = []
+    with open(file_name) as f:
+        lines = f.readlines()
+
+    k = 0
+    # Skip to header
+    while k < len(lines) and '$ROI_ENERGY' not in lines[k]:
+        k += 1
+    k += 1
+
+    while k < len(lines):
+        line = lines[k].strip()
+        if not line or line.startswith('#'):
+            k += 1
+            continue
+        parts = line.split()
+        n_bkg = int(parts[0])
+        peak_lo_keV = float(parts[1])
+        peak_hi_keV = float(parts[2])
+        isotope = parts[3]
+        energy = float(parts[4].replace('keV', ''))
+        origin = parts[5].replace('_', ' ') if len(parts) > 5 else ''
+
+        # Convert peak window from keV to channels
+        peak_lo_ch = int(round(energy_to_channel(peak_lo_keV, calibration)))
+        peak_hi_ch = int(round(energy_to_channel(peak_hi_keV, calibration)))
+
+        # Convert background windows from keV to channels
+        bkg_channels = []
+        for _ in range(n_bkg):
+            k += 1
+            bkg_parts = lines[k].strip().split()
+            bkg_lo_ch = int(round(energy_to_channel(float(bkg_parts[1]), calibration)))
+            bkg_hi_ch = int(round(energy_to_channel(float(bkg_parts[2]), calibration)))
+            bkg_channels.append([bkg_lo_ch, bkg_hi_ch])
+
+        r = sample_collection.ROI([peak_lo_ch, peak_hi_ch], bkg_channels)
+        r.isotope = isotope
+        r.energy = energy
+        r.origin = origin
+        roi_col.append(r)
+        k += 1
+
+    return roi_col
+
+
 def parse_roi(file_name):
     # This function doesn't use xylib, so it remains unchanged.
     # Import only when needed to avoid circular dependency

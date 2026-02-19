@@ -17,6 +17,7 @@ sys.path.insert(0, '../..')
 from image_scripts import sample_collection
 from image_scripts import weather_utils
 from image_scripts import time_utils
+from image_scripts.spectrum_calibration import read_calibration_file
 
 def time_indicies(timestamps,timed):
     p=0
@@ -111,7 +112,8 @@ for x in range(0, len(spec)):
 
 col = sample_collection.SampleCollection()
 col_comp = sample_collection.SampleCollection()
-col.add_roi('/home/dosenet/radwatch-airmonitor/image_scripts/analysis/roi_simple.dat')
+calibration = read_calibration_file('/home/dosenet/radwatch-airmonitor/image_scripts/calibration/calibration_coefficients.txt')
+col.add_roi_energy('/home/dosenet/radwatch-airmonitor/image_scripts/analysis/roi_energy.dat', calibration)
 col.set_eff('/home/dosenet/radwatch-airmonitor/image_scripts/analysis/roof.ecc')
 col_comp.add_roi('/home/dosenet/radwatch-airmonitor/image_scripts/analysis/roi.dat')
 

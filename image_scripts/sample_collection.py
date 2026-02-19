@@ -253,6 +253,10 @@ class SampleCollection:
         import spectra_utils
         self.rois = spectra_utils.parse_roi(file_name)
 
+    def add_roi_energy(self, file_name, calibration):
+        import spectra_utils
+        self.rois = spectra_utils.parse_roi_energy(file_name, calibration)
+
     def set_eff(self, eff_file):
         import spectra_utils
         self.eff_curve = np.asarray(spectra_utils.parse_eff(eff_file))

@@ -672,6 +672,14 @@ def calibrate_from_windows(counts, windows, expected_energies, order=1, plot=Tru
     return calibration, energies, fit_info, peak_results
 
 
+def energy_to_channel(energy_keV, calibration):
+    """Convert energy (keV) to channel number.
+    Inverts E = c0 + c1*ch  =>  ch = (E - c0) / c1
+    Only valid for linear calibration (c2=c3=0)."""
+    c0, c1, c2, c3 = calibration
+    return (energy_keV - c0) / c1
+
+
 def read_calibration_file(filepath):
     """
     Read calibration coefficients from saved text file.
