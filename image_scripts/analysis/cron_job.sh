@@ -33,4 +33,4 @@ mv weather_sorted.csv ./rooftop_tmp
 #ssh rpavlovs@kepler.berkeley.edu 'bash -s' < unpacking_script.sh
 env >> /home/dosenet/radwatch-airmonitor/image_scripts/analysis/out.txt
 #kill $SSH_AGENT_PID
-lftp -e "mirror -Rnv /home/dosenet/rooftop_tmp /test/; quit;" -u coeradwatch-RADWATCH,'x9DvsvP9gbVWT9F' sftp://coeradwatch.sftp.wpengine.com:2222
+lftp -e "mirror -Rnv /home/dosenet/radwatch-airmonitor/image_scripts/analysis/rooftop_tmp /test/; quit;" -u coeradwatch-RADWATCH,'x9DvsvP9gbVWT9F' sftp://coeradwatch.sftp.wpengine.com:2222
