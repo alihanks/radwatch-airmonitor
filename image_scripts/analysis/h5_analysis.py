@@ -98,21 +98,16 @@ if weather.shape[1] < 7:
     print("ERROR: Weather data doesn't have expected number of columns")
     sys.exit(1)
 
-ax = []
 spec = spectra[-1, :]
 # print("comment the line after this in order to get 1hr spec")
 # spec = np.sum(spectra[:300, :], axis=0)
 
-# FIXED: energy axis generation using last sample's calibration
-#last_cal = cals[-1]  # Get calibration for most recent spectrum
-
-# energy axis generation
-for x in range(0, len(spec)):
-    ax.append((x+1)*cals[1, 3]+cals[1, 2])
-
 col = sample_collection.SampleCollection()
 col_comp = sample_collection.SampleCollection()
 calibration = read_calibration_file('/home/dosenet/radwatch-airmonitor/image_scripts/calibration/calibration_coefficients.txt')
+
+# energy axis generation using external calibration file (matches ROI channel mapping)
+ax = [calibration[0] + calibration[1] * (x + 1) for x in range(len(spec))]
 col.add_roi_energy('/home/dosenet/radwatch-airmonitor/image_scripts/analysis/roi_energy.dat', calibration)
 col.set_eff('/home/dosenet/radwatch-airmonitor/image_scripts/analysis/roof.ecc')
 col_comp.add_roi('/home/dosenet/radwatch-airmonitor/image_scripts/analysis/roi.dat')
@@ -291,7 +286,7 @@ for ba_l in bar_ax0.get_yticklabels():
     ba_l.set_color(col_pal[3])
 
 #fix the plots
-mx = np.amax(roi_array)
+mx = np.nanmax(roi_array[:, :, 0])
 axarr[1].set_ylim([0, mx * 1.05])
 legend = axarr[1].legend(loc='upper left', prop={'size': 10})
 gcf().subplots_adjust(wspace=2.5, top=1.1)

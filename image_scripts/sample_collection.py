@@ -266,33 +266,49 @@ class SampleCollection:
         return eff
 
     def standardize_channel_counts(self):
-        """After building collection, standardize all samples to a common channel count"""
+        """After building collection, standardize all samples to a common channel count.
+
+        Upsamples smaller spectra to match the largest channel count, preserving
+        total counts and adjusting the energy calibration accordingly.
+        NOTE: After deploying this change, delete rebin.h5 and last_processed.txt
+        to force a full rebuild (existing HDF5 data has the old channel count).
+        """
         from collections import Counter
-        
+
         # Find all unique channel counts
         channel_counts = [len(s.counts) for s in self.collection]
         count_distribution = Counter(channel_counts)
         print(f"Channel count distribution: {dict(count_distribution)}")
-        
-        # Use the MINIMUM common count (prefer downsampling over upsampling)
-        target_count = min(count_distribution.keys())
-        print(f"Standardizing all samples to {target_count} channels (downsampling preferred)")
-        
+
+        # Use the MAXIMUM common count (upsample to preserve full energy range)
+        target_count = max(count_distribution.keys())
+        print(f"Standardizing all samples to {target_count} channels (upsampling to preserve energy range)")
+
         new_collection = []
         for sample in self.collection:
-            if len(sample.counts) == target_count:
+            n_channels = len(sample.counts)
+            if n_channels == target_count:
                 new_collection.append(sample)
-            elif len(sample.counts) % target_count == 0:
-                # Downsample by summing bins
-                factor = len(sample.counts) // target_count
-                sample.counts = np.asarray(sample.counts).reshape(-1, factor).sum(axis=1)
+            elif target_count % n_channels == 0:
+                # Upsample by splitting each bin's counts across sub-bins
+                factor = target_count // n_channels
+                counts_array = np.asarray(sample.counts)
+                base = counts_array // factor
+                remainder = counts_array % factor
+                # Build upsampled array: each original bin becomes `factor` sub-bins
+                upsampled = np.repeat(base, factor)
+                # Distribute remainder: first sub-bin of each group gets the leftover
+                remainder_extra = np.zeros(target_count, dtype=upsampled.dtype)
+                remainder_extra[::factor] = remainder
+                upsampled = upsampled + remainder_extra
+                sample.counts = upsampled
                 if hasattr(sample, 'bin_cal'):
-                    sample.bin_cal[1] *= factor  # Adjust keV/channel
+                    sample.bin_cal[1] /= factor  # Halve keV/channel since channels doubled
                 new_collection.append(sample)
-                print(f"Downsampled {len(sample.counts)*factor} → {target_count} at {sample.timestamp}")
+                print(f"Upsampled {n_channels} → {target_count} channels at {sample.timestamp}")
             else:
-                print(f"Warning: Cannot convert {len(sample.counts)} channels to {target_count}, skipping sample at {sample.timestamp}")
-        
+                print(f"Warning: Cannot convert {n_channels} channels to {target_count}, skipping sample at {sample.timestamp}")
+
         self.collection = new_collection
         print(f"Standardized to {len(self.collection)} samples with {target_count} channels")
 
