@@ -218,20 +218,25 @@ cla()
 #    tmp=weather[:,wea]/max_;
 #    plot(timestamps,tmp);
 
-#count rate array
-roi_array = np.zeros((s[0], len(col.rois), 2))
-for x in range(0, s[0]):
-    tmp = np.zeros((len(col.rois), 2))
-    k = 0
-    for el in col.rois:
-        tmp[k] = el.get_counts(spectra[x, :]) / tm_meta[x, 1]
-        k += 1
-    roi_array[x, :, :] = tmp
+#count rate array — use stored ROI data if available, else compute on-the-fly
+if 'roi_counts' in data_group:
+    roi_array = data_group['roi_counts'][:]
+    print(f"Using stored ROI counts: shape {roi_array.shape}")
+else:
+    print("No stored ROI counts found, computing on-the-fly...")
+    roi_array = np.zeros((s[0], len(col.rois), 2))
+    for x in range(0, s[0]):
+        tmp = np.zeros((len(col.rois), 2))
+        k = 0
+        for el in col.rois:
+            tmp[k] = el.get_counts(spectra[x, :]) / tm_meta[x, 1]
+            k += 1
+        roi_array[x, :, :] = tmp
 
-# Replace invalid data points with NaN so plots show gaps instead of zeros
-for x in range(0, s[0]):
-    if tm_meta[x, 1] <= 0 or np.sum(spectra[x, :]) == 0:
-        roi_array[x, :, :] = np.nan
+    # Replace invalid data points with NaN so plots show gaps instead of zeros
+    for x in range(0, s[0]):
+        if tm_meta[x, 1] <= 0 or np.sum(spectra[x, :]) == 0:
+            roi_array[x, :, :] = np.nan
 
 
 #plot all isotopes
@@ -253,9 +258,9 @@ for x in range(0, len(col.rois)):
     bar_ax0.plot(timestamps, weather[:, 2], color=col_pal[3])
 
 with open('weather.csv', 'w') as out_file, open('weather_bq.csv', 'w') as out_file_bq:
-    # out_file.write("Time, Pb212, Bi214, Pb212, Tl208, K40, Cs134, Cs137\n")
-    out_file.write("Time, Bi214, K40, Cs134, Cs137\n")
-    out_file_bq.write("Time, Bi214, K40, Cs134, Cs137\n")
+    csv_header = "Time, Pb214, Pb214_err, Bi214, Bi214_err, Pb212, Pb212_err, Tl208, Tl208_err, K40, K40_err, Cs134, Cs134_err, Cs137, Cs137_err\n"
+    out_file.write(csv_header)
+    out_file_bq.write(csv_header)
 
     mins = np.argmin(roi_array[:, :, 0], axis=0)
     print(mins)
@@ -263,12 +268,10 @@ with open('weather.csv', 'w') as out_file, open('weather_bq.csv', 'w') as out_fi
         out_str = str(timestamps[x])
         out_str_bq = str(timestamps[x])
         for y in range(0, len(roi_array[x, :, 0])):
-            if y == 0 or y == 2 or y == 3:
-                continue
             eff = col.get_eff_for_binning(col.rois[y].energy)
             out_str_bq += "," + str((roi_array[x, y, 0] - roi_array[mins[y], y, 0]) / eff) + "," + \
                          str(np.sqrt(roi_array[x, y, 1]**2 + roi_array[mins[y], y, 1]**2) / eff)
-            
+
             out_str += "," + str((roi_array[x, y, 0] - roi_array[mins[y], y, 0])) + "," + \
                       str(np.sqrt(roi_array[x, y, 1]**2 + roi_array[mins[y], y, 1]**2))
         out_str += "\n"

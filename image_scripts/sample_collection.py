@@ -501,26 +501,37 @@ class SampleCollection:
     '''
 
 
-    def write_hdf(self, file_name):
-        """Write collection to HDF5 file using generic 'data' group"""
+    def write_hdf(self, file_name, roi_data=None, roi_labels=None):
+        """Write collection to HDF5 file using generic 'data' group.
+
+        Parameters
+        ----------
+        file_name : str
+            Path to HDF5 output file.
+        roi_data : ndarray, optional
+            ROI counts array with shape (N, num_rois, 2) where [:,:,0] are
+            net counts and [:,:,1] are errors.
+        roi_labels : list of str, optional
+            Isotope labels for each ROI (e.g. ['Pb214', 'Bi214', ...]).
+        """
         print("sample_collection::write_hdf: starting")
         out_file = h5py.File(file_name, 'w')
-        
+
         # Use 'data' instead of hardcoded year
         data_group = out_file.create_group('data')
-        
+
         timstmps = []
         specs = []
         weather_list = []
         specs_meta = []
-        
+
         for stmp in self.collection:
             utc_tmsmp = calendar.timegm(stmp.get_timestamp().utctimetuple())
             timstmps.append(utc_tmsmp)
             specs_meta.append([stmp.real_time.total_seconds(), stmp.live_time.total_seconds(),
                               stmp.bin_cal[0], stmp.bin_cal[1]])
             specs.append(stmp.counts)
-            
+
             if stmp.bool_weather_set():
                 weather_el = [np.mean(stmp.temp), np.mean(stmp.pressures), np.mean(stmp.solar), np.mean(stmp.relh),
                               self.weighted_mean(stmp.wind_speed, stmp.wind_dir), np.mean(stmp.wind_speed), np.sum(stmp.rain)]
@@ -528,12 +539,22 @@ class SampleCollection:
                 weather_el = np.zeros(7)
                 weather_el[:] = np.nan
             weather_list.append(weather_el)
-        
+
         data_group.create_dataset('timestamps', data=timstmps, dtype=np.dtype('uint32'))
         data_group.create_dataset('spectra', data=specs, dtype=np.dtype('uint32'))
         data_group.create_dataset('weather_data', data=weather_list, dtype=float)
         data_group.create_dataset('spectra_meta', data=specs_meta, dtype=float)
-        
+
+        # Store ROI counts if provided
+        if roi_data is not None:
+            data_group.create_dataset('roi_counts', data=roi_data, dtype=float)
+            print(f"sample_collection::write_hdf: stored roi_counts with shape {roi_data.shape}")
+        if roi_labels is not None:
+            # HDF5 requires special string type for variable-length strings
+            dt = h5py.string_dtype()
+            data_group.create_dataset('roi_labels', data=roi_labels, dtype=dt)
+            print(f"sample_collection::write_hdf: stored roi_labels: {roi_labels}")
+
         out_file.close()
         print("sample_collection::write_hdf: complete")
 
@@ -613,9 +634,23 @@ class SampleCollection:
                 
                 self.collection.append(sample)
             
+            # Load ROI data if present
+            if 'roi_counts' in data_group:
+                self.roi_counts = data_group['roi_counts'][:]
+                print(f"Loaded roi_counts with shape {self.roi_counts.shape}")
+            else:
+                self.roi_counts = None
+
+            if 'roi_labels' in data_group:
+                self.roi_labels = [label.decode() if isinstance(label, bytes) else label
+                                   for label in data_group['roi_labels'][:]]
+                print(f"Loaded roi_labels: {self.roi_labels}")
+            else:
+                self.roi_labels = None
+
             print(f"Successfully loaded {len(self.collection)} samples")
             return True
-            
+
         except Exception as e:
             print(f"Error reading HDF5 file: {e}")
             return False
