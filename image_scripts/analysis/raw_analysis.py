@@ -11,10 +11,14 @@ from image_scripts.spectrum_calibration import read_calibration_file
 import datetime
 import numpy as np
 
+PROJECT_ROOT = '/home/dosenet/radwatch-airmonitor'
+DATA_DIR = os.path.join(PROJECT_ROOT, 'data')
+os.makedirs(DATA_DIR, exist_ok=True)
+
 spec_dir = r'/home/dosenet/Dropbox/UCB Air Monitor/Data/Roof/current/'
-weat_csv = r'/home/dosenet/radwatch-airmonitor/weatherhawk.csv'
-weat_csv_sorted = r'weather_sorted.csv'
-roi_dat = r'/home/dosenet/radwatch-airmonitor/image_scripts/analysis/roi.dat'
+weat_csv = os.path.join(PROJECT_ROOT, 'weatherhawk.csv')
+weat_csv_sorted = os.path.join(DATA_DIR, 'weather_sorted.csv')
+roi_dat = os.path.join(PROJECT_ROOT, 'image_scripts', 'analysis', 'roi.dat')
 
 weather_utils.resort_weather_timestamps(weat_csv, weat_csv_sorted)
 print("resorted the weather data")
@@ -34,13 +38,13 @@ print("resorted the weather data")
 
 ## NEW: Added configuration constants at the top
 # Lines 11-14 in raw_analysis_incremental.py
-hdf5_file = 'rebin.h5'
-last_processed_marker = 'last_processed.txt'
-qa_flagged_csv = 'qa_flagged.csv'
+hdf5_file = os.path.join(DATA_DIR, 'rebin.h5')
+last_processed_marker = os.path.join(DATA_DIR, 'last_processed.txt')
+qa_flagged_csv = os.path.join(DATA_DIR, 'qa_flagged.csv')
 
 # Calibration and ROI setup (same files h5_analysis.py uses)
-calibration = read_calibration_file('/home/dosenet/radwatch-airmonitor/image_scripts/calibration/calibration_coefficients.txt')
-roi_energy_file = '/home/dosenet/radwatch-airmonitor/image_scripts/analysis/roi_energy.dat'
+calibration = read_calibration_file(os.path.join(PROJECT_ROOT, 'image_scripts', 'calibration', 'calibration_coefficients.txt'))
+roi_energy_file = os.path.join(PROJECT_ROOT, 'image_scripts', 'analysis', 'roi_energy.dat')
 
 K40_ROI_INDEX = 4  # K-40 is the 5th ROI (0-indexed) in roi_energy.dat
 QA_WINDOW = 24     # Rolling median window (24 hourly bins = 1 day)
@@ -287,11 +291,12 @@ if len(col.collection) > 0:
     print("\nGenerating output files...")
     
     # Create last_spectrum directory if needed
-    os.makedirs('./last_spectrum', exist_ok=True)
-    
+    last_spec_dir = os.path.join(DATA_DIR, 'last_spectrum')
+    os.makedirs(last_spec_dir, exist_ok=True)
+
     # Write spectrum and image from most recent sample
-    col.collection[-1].write_spe('./last_spectrum/rep.spe')
-    col.collection[-1].write_last_update_image("last_update.png")
+    col.collection[-1].write_spe(os.path.join(last_spec_dir, 'rep.spe'))
+    col.collection[-1].write_last_update_image(os.path.join(DATA_DIR, 'last_update.png'))
     
     print(f"Processing complete!")
     print(f"Total samples in database: {len(col.collection)}")

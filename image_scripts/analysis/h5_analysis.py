@@ -19,6 +19,9 @@ from image_scripts import weather_utils
 from image_scripts import time_utils
 from image_scripts.spectrum_calibration import read_calibration_file
 
+PROJECT_ROOT = '/home/dosenet/radwatch-airmonitor'
+DATA_DIR = os.path.join(PROJECT_ROOT, 'data')
+
 def time_indicies(timestamps,timed):
     p=0
     k=1
@@ -52,7 +55,7 @@ col_pal = ['#00B2A5',
             '#003262']
 
 # get the data
-file = h5py.File('./rebin.h5', 'r')
+file = h5py.File(os.path.join(DATA_DIR, 'rebin.h5'), 'r')
 
 # FIXED: Support both 'data' group (new) and legacy year groups (e.g., '2014')
 if 'data' in file:
@@ -104,13 +107,13 @@ spec = spectra[-1, :]
 
 col = sample_collection.SampleCollection()
 col_comp = sample_collection.SampleCollection()
-calibration = read_calibration_file('/home/dosenet/radwatch-airmonitor/image_scripts/calibration/calibration_coefficients.txt')
+calibration = read_calibration_file(os.path.join(PROJECT_ROOT, 'image_scripts', 'calibration', 'calibration_coefficients.txt'))
 
 # energy axis generation using external calibration file (matches ROI channel mapping)
 ax = [calibration[0] + calibration[1] * (x + 1) for x in range(len(spec))]
-col.add_roi_energy('/home/dosenet/radwatch-airmonitor/image_scripts/analysis/roi_energy.dat', calibration)
-col.set_eff('/home/dosenet/radwatch-airmonitor/image_scripts/analysis/roof.ecc')
-col_comp.add_roi('/home/dosenet/radwatch-airmonitor/image_scripts/analysis/roi.dat')
+col.add_roi_energy(os.path.join(PROJECT_ROOT, 'image_scripts', 'analysis', 'roi_energy.dat'), calibration)
+col.set_eff(os.path.join(PROJECT_ROOT, 'image_scripts', 'analysis', 'roof.ecc'))
+col_comp.add_roi(os.path.join(PROJECT_ROOT, 'image_scripts', 'analysis', 'roi.dat'))
 
 
 
@@ -169,7 +172,7 @@ else:
     xlabel('Energy (keV)')
     ylabel('Counts')
     title('Past Hour\'s Gamma Spectrum')
-    savefig('most_recent_spectra.png', transparent=True, bbox_inches='tight')
+    savefig(os.path.join(DATA_DIR, 'most_recent_spectra.png'), transparent=True, bbox_inches='tight')
 clf()
 
 #make isotope table
@@ -257,7 +260,7 @@ for x in range(0, len(col.rois)):
     axarr[2].plot(timestamps, weather[:, 6], color=col_pal[2])
     bar_ax0.plot(timestamps, weather[:, 2], color=col_pal[3])
 
-with open('weather.csv', 'w') as out_file, open('weather_bq.csv', 'w') as out_file_bq:
+with open(os.path.join(DATA_DIR, 'weather.csv'), 'w') as out_file, open(os.path.join(DATA_DIR, 'weather_bq.csv'), 'w') as out_file_bq:
     csv_header = "Time, Pb214, Pb214_err, Bi214, Bi214_err, Pb212, Pb212_err, Tl208, Tl208_err, K40, K40_err, Cs134, Cs134_err, Cs137, Cs137_err\n"
     out_file.write(csv_header)
     out_file_bq.write(csv_header)
@@ -309,7 +312,7 @@ for x in (time_utils.time_wins):
     axarr[2].set_title('Rain and Solar Data', fontweight='bold')
     axarr[1].set_title('Count Rate of Select Peaks vs Time', fontweight='bold')
     axarr[0].set_title('Temperture, Barometric Pressure', fontweight='bold')
-    savefig('iso_' + time_utils.time_wins_str[p] + '.png', transparent=True, bbox_inches='tight')
+    savefig(os.path.join(DATA_DIR, 'iso_' + time_utils.time_wins_str[p] + '.png'), transparent=True, bbox_inches='tight')
     p += 1
 
 fig = figure()
@@ -320,7 +323,7 @@ for x in time_utils.time_wins:
     new_axis.set_xlim([lower, time_utils.right_now])
     new_axis.axes.get_xaxis().set_visible(True)
     setp(new_axis.xaxis.get_majorticklabels(), rotation=45, ha="right")
-    savefig('trimmed_' + time_utils.time_wins_str[p] + '.png', transparent=False, bbox_inches='tight')
+    savefig(os.path.join(DATA_DIR, 'trimmed_' + time_utils.time_wins_str[p] + '.png'), transparent=False, bbox_inches='tight')
     p += 1
 #weather_utils.draw_windrose(weather[:,3],weather[:,4],'hour');
 
@@ -331,4 +334,4 @@ rain_data = np.nan_to_num(weather[:, 6], nan=0.0)
 cum_sum = np.cumsum(rain_data)
 # plot(timestamps, weather[:, 6])
 plot(timestamps, cum_sum)
-savefig('out.png')
+savefig(os.path.join(DATA_DIR, 'out.png'))
