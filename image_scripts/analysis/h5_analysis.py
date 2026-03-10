@@ -242,9 +242,39 @@ else:
             roi_array[x, :, :] = np.nan
 
 
+# Insert NaN breaks wherever time gaps exceed 2 hours so plots show gaps
+# instead of drawing misleading straight lines across data outages
+GAP_THRESHOLD_SEC = 2 * 3600
+gap_indices = []
+for i in range(1, len(timestamps)):
+    dt = (tmstmps[i] - tmstmps[i-1])
+    if dt > GAP_THRESHOLD_SEC:
+        gap_indices.append(i)
+
+if len(gap_indices) > 0:
+    print(f"Inserting {len(gap_indices)} NaN breaks for time gaps > 2 hours")
+    # Build new arrays with NaN rows inserted at gap positions
+    new_timestamps = list(timestamps)
+    new_roi = list(roi_array)
+    new_weather = list(weather[:])
+    nan_roi_row = np.full((roi_array.shape[1], roi_array.shape[2]), np.nan)
+    nan_weather_row = np.full((weather.shape[1],), np.nan)
+    # Insert in reverse order so indices don't shift
+    for idx in reversed(gap_indices):
+        # Insert a NaN point with a timestamp in the middle of the gap
+        mid_time = datetime.datetime.fromtimestamp(
+            time.mktime(time.gmtime((tmstmps[idx-1] + tmstmps[idx]) / 2)))
+        new_timestamps.insert(idx, mid_time)
+        new_roi.insert(idx, nan_roi_row)
+        new_weather.insert(idx, nan_weather_row)
+    timestamps = new_timestamps
+    roi_array = np.array(new_roi)
+    weather = np.array(new_weather)
+    print(f"Data expanded from {s[0]} to {len(timestamps)} points (with NaN breaks)")
+
 #plot all isotopes
 #gs=matplotlib.gridspec.GridSpec(2,1,height_ratios=[1,3]);
-axarr = [subplot2grid((5, 4), (0, 0), colspan=4), subplot2grid((5, 4), (1, 0), rowspan=3, colspan=4), 
+axarr = [subplot2grid((5, 4), (0, 0), colspan=4), subplot2grid((5, 4), (1, 0), rowspan=3, colspan=4),
          subplot2grid((5, 4), (4, 0), rowspan=1, colspan=4)]
 gcf().add_subplot(axarr[0])
 gcf().add_subplot(axarr[0])
@@ -265,9 +295,12 @@ with open(os.path.join(DATA_DIR, 'weather.csv'), 'w') as out_file, open(os.path.
     out_file.write(csv_header)
     out_file_bq.write(csv_header)
 
-    mins = np.argmin(roi_array[:, :, 0], axis=0)
+    mins = np.nanargmin(roi_array[:, :, 0], axis=0)
     print(mins)
     for x in range(max(0, len(timestamps) - 15 * 24), len(timestamps)):
+        # Skip NaN break rows inserted for plot gaps
+        if np.isnan(roi_array[x, 0, 0]):
+            continue
         out_str = str(timestamps[x])
         out_str_bq = str(timestamps[x])
         for y in range(0, len(roi_array[x, :, 0])):

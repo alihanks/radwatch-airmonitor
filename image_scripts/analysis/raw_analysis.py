@@ -49,7 +49,7 @@ roi_energy_file = os.path.join(PROJECT_ROOT, 'image_scripts', 'analysis', 'roi_e
 K40_ROI_INDEX = 4  # K-40 is the 5th ROI (0-indexed) in roi_energy.dat
 QA_WINDOW = 24     # Rolling median window (24 hourly bins = 1 day)
 QA_THRESHOLD = 0.5    # Flag if K-40 rate < 50% of rolling median
-K40_MIN_RATE = 0.05   # Absolute minimum K-40 rate (counts/sec); catches bad data even at start of dataset
+K40_MIN_RATE = 0.15   # Absolute minimum K-40 rate (counts/sec); steady-state is ~0.33, anything below 0.15 is anomalous
 
 
 def load_rois_for_qa():
