@@ -209,7 +209,7 @@ for x in time_utils.time_wins:
     tmp_win_speed = []
     k = weather_utils.discard_data_before_time(timestamps, x, 0) + 1
     print(x, weather[k:, 4], weather[k:, 5])
-    weather_utils.draw_windrose(weather[k:, 4], weather[k:, 5], weather_utils.time_wins_str[p])
+    weather_utils.draw_windrose(weather[k:, 4], weather[k:, 5], weather_utils.time_wins_str[p], output_dir=DATA_DIR)
     p += 1
 clf()
 cla()

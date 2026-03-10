@@ -142,7 +142,7 @@ def draw_compass(wind_direction,wind_speed,time_win_str):
 
     return
     
-def draw_windrose(wind_direction,wind_speed,time_win_str):
+def draw_windrose(wind_direction,wind_speed,time_win_str,output_dir=None):
     if len(wind_direction) <= 1 or len(wind_speed) <= 1:
         print("Something not right with windrose data at time", time_win_str)
         return
@@ -151,11 +151,14 @@ def draw_windrose(wind_direction,wind_speed,time_win_str):
     # make the colormap
     cdict = {'red': ((0, 1, 0), (1, 1, 0.6475)), 'green': ((0, 1, 0.3378), (1, 0.2131, 1)), 'blue': ((0, 1, 0.6622), (1, 0.1393, 1))}
     cmap = LinearSegmentedColormap("myown", cdict)
-    
+
     ax = new_axes()
     ax.bar(wind_direction, wind_speed, normed=True, opening=0.8, edgecolor='white', cmap=cmap)
     set_legend(ax)
-    savefig("rose_" + time_win_str + ".png")  # , transparent=True, bbox_inches='tight')
+    out_path = "rose_" + time_win_str + ".png"
+    if output_dir is not None:
+        out_path = os.path.join(output_dir, out_path)
+    savefig(out_path)
     return
 
 def parse_weather_data(f_name):

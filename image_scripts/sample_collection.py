@@ -678,13 +678,18 @@ class SampleCollection:
         print(f"Parsing weather data from: {weather_csv}")
         list_of_lists, units, label, is_time_str, order = weather_utils.parse_weather_data(weather_csv)
         print(f"Found {len(list_of_lists[timestamps_index])} weather data points")
-        
+
+        import re
         file_pattern = spec_dir + '*/*.CNF'
         print(f"Searching for files matching pattern: {file_pattern}")
         fil_list = glob.glob(file_pattern)
-        print(f"Found {len(fil_list)} spectral files")
+        # Filter to only files in date-formatted directories (YYYY-MM-DD*)
+        # to exclude test folders like temp_test_folder/ that sort incorrectly
+        date_dir_re = re.compile(r'/\d{4}-\d{2}-\d{2}')
+        fil_list = [f for f in fil_list if date_dir_re.search(f)]
+        print(f"Found {len(fil_list)} spectral files (after filtering to date directories)")
         fil_list.sort()
-        
+
         # Determine starting point based on last processed file
         start_index = 0
         if os.path.exists(last_processed_marker):
