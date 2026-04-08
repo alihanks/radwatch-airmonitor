@@ -51,11 +51,82 @@ QA_WINDOW = 24     # Rolling median window (24 hourly bins = 1 day)
 QA_THRESHOLD = 0.5    # Flag if K-40 rate < 50% of rolling median
 K40_MIN_RATE = 0.15   # Absolute minimum K-40 rate (counts/sec); steady-state is ~0.33, anything below 0.15 is anomalous
 
+# K-40 livetime estimation constants
+K40_LIVETIME_THRESHOLD = 0.90  # Only correct livetimes when K-40 counts < 90% of median
+PRESET_LIVETIME = 300.0        # Nominal collection interval in seconds
+
 
 def load_rois_for_qa():
     """Load ROI definitions using the energy-based ROI file and calibration."""
     import spectra_utils
     return spectra_utils.parse_roi_energy(roi_energy_file, calibration)
+
+
+def compute_k40_gross_counts(collection, k40_roi):
+    """Compute K-40 gross counts for each sample in a collection.
+
+    Parameters
+    ----------
+    collection : list of Sample
+        Raw (pre-rebin) samples.
+    k40_roi : ROI
+        The K-40 ROI object.
+
+    Returns
+    -------
+    k40_counts : ndarray of float (N,)
+        Gross K-40 counts for each spectrum.
+    """
+    k40_counts = np.empty(len(collection))
+    for i, sample in enumerate(collection):
+        spec = np.asarray(sample.counts)
+        counts, _ = k40_roi.get_counts(spec)
+        k40_counts[i] = counts
+    return k40_counts
+
+
+def estimate_livetimes_from_k40(collection, k40_roi, median_k40, preset_time=PRESET_LIVETIME):
+    """Correct livetimes for spectra with fewer K-40 counts than expected.
+
+    For each sample, compares K-40 gross counts to the stored median baseline.
+    If the ratio is below K40_LIVETIME_THRESHOLD, the livetime is scaled down
+    proportionally. Corrections are only applied downward (never increases
+    livetime above the preset).
+
+    Parameters
+    ----------
+    collection : list of Sample
+        Raw (pre-rebin) samples whose live_time may be corrected in-place.
+    k40_roi : ROI
+        The K-40 ROI object.
+    median_k40 : float
+        Median K-40 gross counts baseline.
+    preset_time : float
+        Nominal collection interval in seconds.
+    """
+    if median_k40 is None or median_k40 <= 0:
+        print("estimate_livetimes_from_k40: invalid median, skipping correction")
+        return
+
+    corrections = 0
+    for sample in collection:
+        spec = np.asarray(sample.counts)
+        counts, _ = k40_roi.get_counts(spec)
+        ratio = counts / median_k40
+
+        if ratio < K40_LIVETIME_THRESHOLD:
+            original_lt = sample.live_time.total_seconds() if hasattr(sample.live_time, 'total_seconds') else float(sample.live_time)
+            corrected_lt = preset_time * ratio
+            # Only correct downward
+            corrected_lt = min(corrected_lt, original_lt)
+            if corrected_lt > 0:
+                sample.live_time = datetime.timedelta(seconds=corrected_lt)
+                corrections += 1
+                print(f"  K40 livetime correction: {sample.timestamp} | "
+                      f"original={original_lt:.1f}s → corrected={corrected_lt:.1f}s | "
+                      f"K40 ratio={ratio:.3f}")
+
+    print(f"estimate_livetimes_from_k40: corrected {corrections}/{len(collection)} spectra")
 
 
 def compute_roi_counts_for_collection(collection, rois):
@@ -187,6 +258,20 @@ if existing_data_loaded:
         # Standardize channel counts for new data
         col_new.standardize_channel_counts()
 
+        # K-40 livetime correction on raw spectra (before rebinning)
+        print("\nApplying K-40 livetime correction to new spectra...")
+        rois_lt = load_rois_for_qa()
+        k40_roi = rois_lt[K40_ROI_INDEX]
+        if col.k40_median_counts is not None:
+            estimate_livetimes_from_k40(col_new.collection, k40_roi, col.k40_median_counts)
+            k40_median = col.k40_median_counts
+        else:
+            print("WARNING: No stored K-40 median found in HDF5, computing from new data")
+            k40_counts = compute_k40_gross_counts(col_new.collection, k40_roi)
+            k40_median = float(np.median(k40_counts))
+            print(f"Computed K-40 median counts from new data: {k40_median:.2f}")
+            estimate_livetimes_from_k40(col_new.collection, k40_roi, k40_median)
+
         # Rebin new data
         print("\nRebinning new data...")
         col_new.rebin(datetime.timedelta(hours=1.0))
@@ -226,7 +311,8 @@ if existing_data_loaded:
 
         # Write updated HDF5 with ROI data
         print("\nWriting updated database...")
-        col.write_hdf(hdf5_file, roi_data=full_roi_array, roi_labels=roi_labels)
+        col.write_hdf(hdf5_file, roi_data=full_roi_array, roi_labels=roi_labels,
+                      k40_median_counts=k40_median)
         print('Database updated')
     else:
         print("\nNo new files to process")
@@ -241,6 +327,15 @@ else:
     if len(col.collection) > 0:
         # Standardize channel counts
         col.standardize_channel_counts()
+
+        # K-40 livetime correction on raw spectra (before rebinning)
+        print("\nComputing K-40 livetime baseline and correcting livetimes...")
+        rois_lt = load_rois_for_qa()
+        k40_roi = rois_lt[K40_ROI_INDEX]
+        k40_counts = compute_k40_gross_counts(col.collection, k40_roi)
+        k40_median = float(np.median(k40_counts))
+        print(f"K-40 median gross counts: {k40_median:.2f}")
+        estimate_livetimes_from_k40(col.collection, k40_roi, k40_median)
 
         # Rebin
         print("\nRebinning data...")
@@ -264,7 +359,8 @@ else:
 
         # Write HDF5 with ROI data
         print("\nWriting database...")
-        col.write_hdf(hdf5_file, roi_data=roi_array, roi_labels=roi_labels)
+        col.write_hdf(hdf5_file, roi_data=roi_array, roi_labels=roi_labels,
+                      k40_median_counts=k40_median)
         print('Database written')
     else:
         print("No data to process")

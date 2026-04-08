@@ -241,6 +241,7 @@ class SampleCollection:
         self.collection = []
         self.rois = []
         self.eff_curve = []
+        self.k40_median_counts = None
 
     def __str__(self):
         return str(len(self.collection))
@@ -501,7 +502,7 @@ class SampleCollection:
     '''
 
 
-    def write_hdf(self, file_name, roi_data=None, roi_labels=None):
+    def write_hdf(self, file_name, roi_data=None, roi_labels=None, k40_median_counts=None):
         """Write collection to HDF5 file using generic 'data' group.
 
         Parameters
@@ -513,6 +514,8 @@ class SampleCollection:
             net counts and [:,:,1] are errors.
         roi_labels : list of str, optional
             Isotope labels for each ROI (e.g. ['Pb214', 'Bi214', ...]).
+        k40_median_counts : float, optional
+            Median K-40 gross counts per spectrum (used for livetime estimation).
         """
         print("sample_collection::write_hdf: starting")
         out_file = h5py.File(file_name, 'w')
@@ -555,6 +558,10 @@ class SampleCollection:
             data_group.create_dataset('roi_labels', data=roi_labels, dtype=dt)
             print(f"sample_collection::write_hdf: stored roi_labels: {roi_labels}")
 
+        if k40_median_counts is not None:
+            data_group.create_dataset('k40_median_counts', data=float(k40_median_counts))
+            print(f"sample_collection::write_hdf: stored k40_median_counts = {k40_median_counts:.2f}")
+
         out_file.close()
         print("sample_collection::write_hdf: complete")
 
@@ -589,27 +596,48 @@ class SampleCollection:
             spectra = data_group['spectra'][:]
             weather_data = data_group['weather_data'][:]
             spectra_meta = data_group['spectra_meta'][:]
-            
+
+            # Load ROI data if present
+            if 'roi_counts' in data_group:
+                self.roi_counts = data_group['roi_counts'][:]
+                print(f"Loaded roi_counts with shape {self.roi_counts.shape}")
+            else:
+                self.roi_counts = None
+
+            if 'roi_labels' in data_group:
+                self.roi_labels = [label.decode() if isinstance(label, bytes) else label
+                                   for label in data_group['roi_labels'][:]]
+                print(f"Loaded roi_labels: {self.roi_labels}")
+            else:
+                self.roi_labels = None
+
+            # Load K-40 median counts baseline if present
+            if 'k40_median_counts' in data_group:
+                self.k40_median_counts = float(data_group['k40_median_counts'][()])
+                print(f"Loaded k40_median_counts = {self.k40_median_counts:.2f}")
+            else:
+                self.k40_median_counts = None
+
             in_file.close()
-            
+
             print(f"Loaded {len(timestamps)} samples from HDF5")
-            
+
             # Reconstruct Sample objects from the HDF5 data
             for i in range(len(timestamps)):
                 sample = Sample()
-                
+
                 # Convert UTC timestamp back to datetime
                 sample.timestamp = datetime.datetime.utcfromtimestamp(timestamps[i]).replace(tzinfo=datetime.timezone.utc)
-                
+
                 # Set spectra data
                 sample.real_time = datetime.timedelta(seconds=spectra_meta[i][0])
                 sample.live_time = datetime.timedelta(seconds=spectra_meta[i][1])
                 sample.bin_cal = np.array([spectra_meta[i][2], spectra_meta[i][3]])
                 sample.counts = spectra[i]
-                
+
                 # Reconstruct bin_lim (assuming it spans the full range)
                 sample.bin_lim = np.array([0, len(spectra[i]) - 1])
-                
+
                 # Set weather data (these are already averaged in the HDF5)
                 # Store as single-element arrays to match the expected format
                 if not np.isnan(weather_data[i][0]):
@@ -631,22 +659,8 @@ class SampleCollection:
                     sample.wind_speed = np.zeros(0)
                     sample.wind_dir = np.zeros(0)
                     sample.rain = np.zeros(0)
-                
-                self.collection.append(sample)
-            
-            # Load ROI data if present
-            if 'roi_counts' in data_group:
-                self.roi_counts = data_group['roi_counts'][:]
-                print(f"Loaded roi_counts with shape {self.roi_counts.shape}")
-            else:
-                self.roi_counts = None
 
-            if 'roi_labels' in data_group:
-                self.roi_labels = [label.decode() if isinstance(label, bytes) else label
-                                   for label in data_group['roi_labels'][:]]
-                print(f"Loaded roi_labels: {self.roi_labels}")
-            else:
-                self.roi_labels = None
+                self.collection.append(sample)
 
             print(f"Successfully loaded {len(self.collection)} samples")
             return True
