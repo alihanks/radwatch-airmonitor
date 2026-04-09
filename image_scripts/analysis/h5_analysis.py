@@ -22,6 +22,37 @@ from image_scripts.spectrum_calibration import read_calibration_file
 PROJECT_ROOT = '/home/dosenet/radwatch-airmonitor'
 DATA_DIR = os.path.join(PROJECT_ROOT, 'data')
 
+def build_merged_weather(rad_timestamps, hdf5_weather, csv_timestamps, csv_temp,
+                         csv_pres, csv_rain, csv_solar, gap_threshold_sec):
+    """Build merged weather timeline: HDF5 data where radiation exists, CSV data in gaps."""
+    merged_ts = list(rad_timestamps)
+    merged_temp = list(hdf5_weather[:, 0])
+    merged_pres = list(hdf5_weather[:, 1])
+    merged_rain = list(hdf5_weather[:, 6])
+    merged_solar = list(hdf5_weather[:, 2])
+
+    for i in range(1, len(rad_timestamps)):
+        gap_start = rad_timestamps[i - 1]
+        gap_end = rad_timestamps[i]
+        dt_sec = (gap_end - gap_start).total_seconds()
+        if dt_sec > gap_threshold_sec:
+            for j, ct in enumerate(csv_timestamps):
+                if ct > gap_start and ct < gap_end:
+                    merged_ts.append(ct)
+                    merged_temp.append(csv_temp[j])
+                    merged_pres.append(csv_pres[j])
+                    merged_rain.append(csv_rain[j])
+                    merged_solar.append(csv_solar[j])
+
+    sort_idx = sorted(range(len(merged_ts)), key=lambda k: merged_ts[k])
+    merged_ts = [merged_ts[k] for k in sort_idx]
+    merged_temp = [merged_temp[k] for k in sort_idx]
+    merged_pres = [merged_pres[k] for k in sort_idx]
+    merged_rain = [merged_rain[k] for k in sort_idx]
+    merged_solar = [merged_solar[k] for k in sort_idx]
+
+    return merged_ts, merged_temp, merged_pres, merged_rain, merged_solar
+
 def time_indicies(timestamps,timed):
     p=0
     k=1
@@ -84,6 +115,19 @@ print(spectra)
 cals = data_group['spectra_meta']
 weather = data_group['weather_data']
 
+# Load continuous weather data from CSV for gap-filling
+weat_csv_sorted = os.path.join(DATA_DIR, 'weather_sorted.csv')
+csv_weather_available = os.path.exists(weat_csv_sorted)
+if csv_weather_available:
+    csv_weather_raw, _, _, _, _ = weather_utils.parse_weather_data(weat_csv_sorted)
+    csv_weather_timestamps = [t.replace(tzinfo=None) for t in csv_weather_raw[1]]
+    csv_weather_temp = csv_weather_raw[2]
+    csv_weather_pres = csv_weather_raw[8]
+    csv_weather_rain = csv_weather_raw[12]
+    csv_weather_solar = csv_weather_raw[13]
+    print(f"Loaded {len(csv_weather_timestamps)} weather CSV records for gap-filling")
+else:
+    print("weather_sorted.csv not found, weather will only use HDF5 data")
 
 # FIXED: Use proper shape access
 s = spectra.shape
@@ -242,9 +286,10 @@ else:
             roi_array[x, :, :] = np.nan
 
 
-# Insert NaN breaks wherever time gaps exceed 2 hours so plots show gaps
-# instead of drawing misleading straight lines across data outages
+# Insert NaN breaks wherever time gaps exceed 2 hours so radiation plots
+# show gaps instead of drawing misleading straight lines across data outages
 GAP_THRESHOLD_SEC = 2 * 3600
+rad_timestamps = list(timestamps)  # Save pre-NaN-break timestamps for weather merging
 gap_indices = []
 for i in range(1, len(timestamps)):
     dt = (tmstmps[i] - tmstmps[i-1])
@@ -253,24 +298,30 @@ for i in range(1, len(timestamps)):
 
 if len(gap_indices) > 0:
     print(f"Inserting {len(gap_indices)} NaN breaks for time gaps > 2 hours")
-    # Build new arrays with NaN rows inserted at gap positions
     new_timestamps = list(timestamps)
     new_roi = list(roi_array)
-    new_weather = list(weather[:])
     nan_roi_row = np.full((roi_array.shape[1], roi_array.shape[2]), np.nan)
-    nan_weather_row = np.full((weather.shape[1],), np.nan)
-    # Insert in reverse order so indices don't shift
     for idx in reversed(gap_indices):
-        # Insert a NaN point with a timestamp in the middle of the gap
         mid_time = datetime.datetime.fromtimestamp(
             time.mktime(time.gmtime((tmstmps[idx-1] + tmstmps[idx]) / 2)))
         new_timestamps.insert(idx, mid_time)
         new_roi.insert(idx, nan_roi_row)
-        new_weather.insert(idx, nan_weather_row)
     timestamps = new_timestamps
     roi_array = np.array(new_roi)
-    weather = np.array(new_weather)
     print(f"Data expanded from {s[0]} to {len(timestamps)} points (with NaN breaks)")
+
+# Build merged weather timeline: HDF5 data where radiation exists, CSV data in gaps
+if csv_weather_available:
+    weather_timestamps, weather_temp, weather_pres, weather_rain, weather_solar = build_merged_weather(
+        rad_timestamps, weather, csv_weather_timestamps, csv_weather_temp,
+        csv_weather_pres, csv_weather_rain, csv_weather_solar, GAP_THRESHOLD_SEC)
+    print(f"Merged weather timeline: {len(weather_timestamps)} points")
+else:
+    weather_timestamps = rad_timestamps
+    weather_temp = list(weather[:, 0])
+    weather_pres = list(weather[:, 1])
+    weather_rain = list(weather[:, 6])
+    weather_solar = list(weather[:, 2])
 
 #plot all isotopes
 #gs=matplotlib.gridspec.GridSpec(2,1,height_ratios=[1,3]);
@@ -282,13 +333,15 @@ axarr[0].axes.get_xaxis().set_visible(False)
 axarr[1].axes.get_xaxis().set_visible(False)
 bar_ax = axarr[0].twinx()
 bar_ax0 = axarr[2].twinx()
+# Plot weather on its own (merged) timeline — continuous through radiation gaps
+axarr[0].plot(weather_timestamps, weather_temp, color=col_pal[0])
+bar_ax.plot(weather_timestamps, weather_pres, color=col_pal[1])
+axarr[2].plot(weather_timestamps, weather_rain, color=col_pal[2])
+bar_ax0.plot(weather_timestamps, weather_solar, color=col_pal[3])
+# Plot radiation data (with NaN breaks for gaps) for each ROI
 for x in range(0, len(col.rois)):
-    axarr[0].plot(timestamps, weather[:, 0], color=col_pal[0])
-    bar_ax.plot(timestamps, weather[:, 1], color=col_pal[1])
-    axarr[1].errorbar(timestamps, roi_array[:, x, 0], yerr=roi_array[:, x, 1], marker='+', 
+    axarr[1].errorbar(timestamps, roi_array[:, x, 0], yerr=roi_array[:, x, 1], marker='+',
                       label=col.rois[x].isotope, color=col_pal[4+x])
-    axarr[2].plot(timestamps, weather[:, 6], color=col_pal[2])
-    bar_ax0.plot(timestamps, weather[:, 2], color=col_pal[3])
 
 with open(os.path.join(DATA_DIR, 'weather.csv'), 'w') as out_file, open(os.path.join(DATA_DIR, 'weather_bq.csv'), 'w') as out_file_bq:
     csv_header = "Time, Pb214, Pb214_err, Bi214, Bi214_err, Pb212, Pb212_err, Tl208, Tl208_err, K40, K40_err, Cs134, Cs134_err, Cs137, Cs137_err\n"
@@ -363,8 +416,7 @@ for x in time_utils.time_wins:
 # tmp plot of rainfall
 clf()
 # make cummulative sum
-rain_data = np.nan_to_num(weather[:, 6], nan=0.0)
+rain_data = np.nan_to_num(np.array(weather_rain), nan=0.0)
 cum_sum = np.cumsum(rain_data)
-# plot(timestamps, weather[:, 6])
-plot(timestamps, cum_sum)
+plot(weather_timestamps, cum_sum)
 savefig(os.path.join(DATA_DIR, 'out.png'))
