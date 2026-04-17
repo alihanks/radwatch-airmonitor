@@ -150,6 +150,14 @@ The RadWatch air monitor is a rooftop gamma-ray spectroscopy system at UC Berkel
 4. Check `data/rebin.h5` exists and has recent mtime
 5. Check `data/*.png` exist after a manual run
 
+### 2026-04-16: Add Architecture Docs and Setup Script
+
+**Motivation:** Document the system end-to-end for long-term maintainability, and provide a setup script so the pipeline can be stood up on a new server from a fresh git clone.
+
+**New files:**
+- **`docs/architecture.md`** - Complete system documentation: data flow diagrams (ASCII), HDF5 schema, cron schedule, calibration details, and a file reference table for every script, config, and data file in the pipeline.
+- **`setup.sh`** - Server setup script that: installs Python dependencies, creates the data directory, checks for Dropbox/weather/calibration files, tests all module imports, and prints next steps (crontab install, manual test run).
+
 ---
 
 ## Known Issues & Future Work
