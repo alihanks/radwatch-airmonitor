@@ -23,8 +23,9 @@ def gather_data():
     print(data_frame[1])
     data_frame = data_frame[3].iloc[1:]
 
-    # wind direction conversion
-    data_frame.loc[:, 'Wind'] = data_frame.loc[:, 'Wind'].replace(NSEW_TO_DEG)
+    # wind direction conversion (NaN values stay NaN)
+    wind = data_frame.loc[:, 'Wind']
+    data_frame.loc[:, 'Wind'] = wind.map(lambda v: NSEW_TO_DEG.get(v, v) if isinstance(v, str) else v)
 
     # time conversion
     data_frame['Time'] = pd.to_datetime(str(date) + ' ' + data_frame['Time'], format='%Y-%m-%d %I:%M %p')
