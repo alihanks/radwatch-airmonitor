@@ -15,6 +15,8 @@ LOGNAME=dosenet/radwatch-airmonitor
 DISPLAY=localhost:10.0
 #_=/usr/bin/env
 
+export PYTHONUNBUFFERED=1
+
 DATA_DIR=/home/dosenet/radwatch-airmonitor/data
 LOGFILE=${DATA_DIR}/pipeline.log
 
