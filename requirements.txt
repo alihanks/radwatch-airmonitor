@@ -1,0 +1,13 @@
+# RadWatch Air Monitor - pip dependencies
+# Usage: pip install -r requirements.txt
+
+# Required by active pipeline
+numpy
+h5py
+matplotlib
+pandas
+Pillow
+pytz
+
+# Optional: only needed for interactive calibration notebooks
+# scipy

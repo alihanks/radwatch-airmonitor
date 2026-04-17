@@ -4,7 +4,7 @@ This document describes how the RadWatch rooftop air monitor pipeline works, fro
 
 ## System Overview
 
-The RadWatch air monitor is a gamma-ray spectroscopy system on the UC Berkeley rooftop. A detector continuously collects gamma spectra (saved as `.CNF` files by the MCA hardware), while a nearby WeatherHawk station records weather conditions. A server (`dosenet`) runs a cron job every hour that processes new spectral data, correlates it with weather, and publishes time-series plots to a website via SFTP.
+The RadWatch air monitor is a gamma-ray spectroscopy system on the UC Berkeley rooftop. A detector continuously collects gamma spectra (saved as `.CNF` files by the MCA hardware), while a nearby WeatherHawk station records weather conditions. A server (`dosenet`) runs a cron job every hour that processes new spectral data, correlates it with weather, and publishes time-series plots to a website via SFTP. The pipeline runs inside an isolated `radwatch` conda environment (see `environment.yml`).
 
 ```
   Detector (MCA)          WeatherHawk Station
@@ -180,7 +180,7 @@ From `crontab.txt`:
 ### Pipeline scripts (run order)
 | File | Purpose |
 |------|---------|
-| `image_scripts/analysis/cron_job.sh` | Orchestrates the pipeline, logs to `data/pipeline.log` |
+| `image_scripts/analysis/cron_job.sh` | Orchestrates the pipeline: activates `radwatch` conda env, runs scripts, logs to `data/pipeline.log` |
 | `image_scripts/weather_gatherer.py` | Scrapes WeatherUnderground, appends to `weatherhawk.csv` |
 | `image_scripts/analysis/raw_analysis.py` | Processes CNF files, builds/updates `rebin.h5` |
 | `image_scripts/analysis/h5_analysis.py` | Reads `rebin.h5`, generates all plots |
@@ -189,19 +189,22 @@ From `crontab.txt`:
 | File | Purpose |
 |------|---------|
 | `image_scripts/sample_collection.py` | HDF5 I/O, rebinning, channel standardization, incremental processing |
-| `image_scripts/spectra_utils.py` | CNF file parsing (via `becquerel` / `cnf_parser_standalone`) |
-| `image_scripts/spectrum_calibration.py` | Energy calibration from coefficients file |
+| `image_scripts/spectra_utils.py` | CNF file parsing (via `cnf_parser_standalone`), ROI parsing |
+| `image_scripts/spectrum_calibration.py` | Energy calibration from coefficients file; scipy/matplotlib lazy-imported for notebook use |
 | `image_scripts/weather_utils.py` | Weather CSV parsing, wind rose drawing |
 | `image_scripts/time_utils.py` | Time window definitions (1 day, 1 week, 1 month, 1 year) |
 | `image_scripts/cnf_parser_standalone.py` | Standalone CNF binary file reader |
 
-### Configuration files
+### Configuration & environment files
 | File | Purpose |
 |------|---------|
 | `image_scripts/analysis/roi_energy.dat` | ROI windows in keV (energy-based, current) |
 | `image_scripts/analysis/roi.dat` | ROI windows in channels (legacy) |
 | `image_scripts/analysis/roof.ecc` | Detector efficiency calibration |
 | `image_scripts/calibration/calibration_coefficients.txt` | Energy calibration: offset + slope (keV/channel) |
+| `environment.yml` | Conda environment spec (env name: `radwatch`) |
+| `requirements.txt` | Pip fallback dependency list |
+| `setup.sh` | Server setup script: creates conda env, checks prerequisites, tests imports |
 
 ### Data files
 | File | Purpose |

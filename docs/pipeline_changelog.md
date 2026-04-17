@@ -1,5 +1,77 @@
 # Analysis Pipeline Changelog
 
+## 2026-04-16: Dead Code Cleanup, Lazy Imports, and Conda Environment
+
+### Problem
+The codebase had accumulated dead code from testing and development: commented-out
+becquerel and xylib implementations inside `'''` blocks, unused imports, old debugging
+prints, and legacy collection-building code. Several top-level imports pulled in
+packages (`becquerel`, `scipy`, `matplotlib`) that were only used by dead code or
+interactive notebooks, not the production pipeline. The setup script used bare
+`pip install` which risked conflicting with other projects on the server.
+
+### Changes
+
+#### `image_scripts/spectra_utils.py`
+- Removed `import becquerel as bq` and `#import xylib` -- all usage was in dead code
+- Removed helper functions `_meta_to_dict()` and `_read_first_block_xy()` -- only
+  used by the removed xylib/becquerel code paths
+- Removed two `'''...'''` blocks: old becquerel implementations of `parse_spectra`
+  and `load_xy` (the active versions use `cnf_parser_standalone`)
+
+#### `image_scripts/sample_collection.py`
+- Removed `from itertools import chain` -- never used anywhere
+- Removed old `'''...'''` `write_hdf` block with hardcoded `'2014'` group name
+  (superseded by the current `write_hdf` that uses a `'data'` group)
+
+#### `image_scripts/analysis/raw_analysis.py`
+- Removed three blocks of commented-out code:
+  - Old `build_collection`/`rebin`/`write_hdf` calls (superseded by incremental pipeline)
+  - Diagnostic print blocks (used during channel standardization debugging)
+  - Old `write_spe`/`write_last_update_image` calls (now use `DATA_DIR` paths)
+
+#### `image_scripts/analysis/h5_analysis.py`
+- Removed five small commented-out blocks: old color palette file loading, old
+  efficiency correction loop, old weather plotting loop, old gridspec line,
+  old windrose call
+
+#### `image_scripts/spectrum_calibration.py`
+- Moved `scipy.signal.find_peaks`, `scipy.optimize.curve_fit`, and
+  `matplotlib.pyplot` from top-level imports to lazy imports inside the functions
+  that actually use them
+- Pipeline functions (`read_calibration_file`, `apply_calibration`,
+  `energy_to_channel`) no longer require scipy or matplotlib at import time
+- Result: `scipy` is now optional (only needed for interactive calibration notebooks)
+
+#### New files
+- **`environment.yml`**: Conda environment spec (name: `radwatch`) with required
+  packages (numpy, h5py, matplotlib, pandas, Pillow, pytz). scipy listed as optional.
+- **`requirements.txt`**: Pip fallback with the same package list.
+
+#### `setup.sh`
+- Rewritten to create/update the `radwatch` conda env from `environment.yml`
+  instead of bare `pip install`
+- Import tests now run inside the activated conda env
+
+#### `image_scripts/analysis/cron_job.sh`
+- Added `conda activate radwatch` after PATH setup to isolate the pipeline from
+  the system Python
+
+#### Documentation
+- Updated `README.md` with proper project overview, setup instructions, and
+  project structure
+- Updated `docs/architecture.md` with conda env references, lazy import notes,
+  and new files in the file reference table
+- Updated `LOGBOOK.md` with session entry
+
+### Verification
+- `python3 -c "import spectra_utils"` -- succeeds without becquerel/xylib
+- `python3 -c "from image_scripts.spectrum_calibration import read_calibration_file"` --
+  succeeds without scipy
+- Full pipeline: `bash cron_job.sh`
+
+---
+
 ## 2026-02-23: Data Quality Checks, ROI Storage, and CSV Expansion
 
 ### Problem

@@ -158,6 +158,30 @@ The RadWatch air monitor is a rooftop gamma-ray spectroscopy system at UC Berkel
 - **`docs/architecture.md`** - Complete system documentation: data flow diagrams (ASCII), HDF5 schema, cron schedule, calibration details, and a file reference table for every script, config, and data file in the pipeline.
 - **`setup.sh`** - Server setup script that: installs Python dependencies, creates the data directory, checks for Dropbox/weather/calibration files, tests all module imports, and prints next steps (crontab install, manual test run).
 
+### 2026-04-16: Dead Code Cleanup & Conda Environment
+
+**Problem:** The codebase had accumulated dead code from testing/development (becquerel and xylib implementations inside `'''` blocks, old debugging prints, legacy collection-building code). Several top-level imports pulled in packages only used by dead code. The setup script used bare `pip install` which risks conflicts with the other project on the server.
+
+**Changes:**
+
+- **`spectra_utils.py`**: Removed `import becquerel`, `#import xylib` comment, two `'''...'''` dead code blocks (old becquerel `parse_spectra` and `load_xy`), and helper functions `_meta_to_dict` / `_read_first_block_xy` that were only used by the removed code paths.
+
+- **`sample_collection.py`**: Removed unused `from itertools import chain` import and old `'''...'''` `write_hdf` block with hardcoded `'2014'` group.
+
+- **`raw_analysis.py`**: Removed three blocks of commented-out legacy code: old `build_collection`/`rebin`/`write_hdf` calls, diagnostic print blocks, and old `write_spe`/`write_last_update_image` calls.
+
+- **`h5_analysis.py`**: Removed five small commented-out blocks: old color palette file loading, old efficiency correction loop, old weather plotting loop, old gridspec line, old windrose call.
+
+- **`spectrum_calibration.py`**: Moved `scipy.signal.find_peaks`, `scipy.optimize.curve_fit`, and `matplotlib.pyplot` behind lazy imports inside the functions that use them. Pipeline functions (`read_calibration_file`, `apply_calibration`, `energy_to_channel`) no longer require scipy or matplotlib at import time.
+
+- **`environment.yml`** (new): Conda environment spec (`radwatch`) with required packages (numpy, h5py, matplotlib, pandas, Pillow, pytz). scipy listed as optional for notebooks.
+
+- **`requirements.txt`** (new): Pip fallback with the same package list.
+
+- **`setup.sh`**: Rewritten to create/update the `radwatch` conda env from `environment.yml` instead of bare `pip install`. Import tests now run inside the env.
+
+- **`cron_job.sh`**: Added `conda activate radwatch` after PATH setup to isolate the pipeline from the system Python.
+
 ---
 
 ## Known Issues & Future Work

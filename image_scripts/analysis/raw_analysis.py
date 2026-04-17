@@ -22,21 +22,8 @@ roi_dat = os.path.join(PROJECT_ROOT, 'image_scripts', 'analysis', 'roi.dat')
 
 weather_utils.resort_weather_timestamps(weat_csv, weat_csv_sorted)
 print("resorted the weather data")
-#col = sample_collection.SampleCollection()
-#print("Collection made")
-#col.build_collection(spec_dir, weat_csv_sorted)
 
-# Add this line:
-#col.standardize_channel_counts()
-
-#col.rebin(datetime.timedelta(hours=1.0))
-#print('rebinned')
-#col.write_hdf('rebin.h5')
-#print('db written')
-#col.rebin(datetime.timedelta(hours=8.))
-#col.write_hdf('short.h5')
-
-## NEW: Added configuration constants at the top
+## Configuration constants
 # Lines 11-14 in raw_analysis_incremental.py
 hdf5_file = os.path.join(DATA_DIR, 'rebin.h5')
 last_processed_marker = os.path.join(DATA_DIR, 'last_processed.txt')
@@ -368,18 +355,6 @@ else:
 
 print("Collection built")
 print("Size ", len(col.collection))
-#col.rebin(datetime.timedelta(minutes=20));
-#col.write_hdf('mod_rebin.h5');
-
-# Add this before the rebin call to diagnose the issue
-#print(f"Collection size: {len(col.collection)}")
-#for i, sample in enumerate(col.collection[:5]):  # Check first 5
-#    print(f"Sample {i}: counts shape = {sample.counts.shape if hasattr(sample.counts, 'shape') else len(sample.counts)}")
-
-# Check the samples that will be grouped together
-#print(f"\nChecking samples 9962-9998:")
-#for i in range(9962, min(9998, len(col.collection))):
-#    print(f"  Sample {i}: shape={col.collection[i].counts.shape}, timestamp={col.collection[i].timestamp}")
 
 # ----------------------------------------
 # Generate output files from the latest data
@@ -399,7 +374,3 @@ if len(col.collection) > 0:
     print(f"Date range: {col.collection[0].timestamp} to {col.collection[-1].timestamp}")
 else:
     print("No data available to generate outputs")
-
-#os.makedirs('./last_spectrum', exist_ok=True)
-#col.collection[-1].write_spe('./last_spectrum/rep.spe')
-#col.collection[-1].write_last_update_image("last_update.png")

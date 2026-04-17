@@ -36,9 +36,6 @@ Example usage in notebook:
 """
 
 import numpy as np
-import matplotlib.pyplot as plt
-from scipy.signal import find_peaks
-from scipy.optimize import curve_fit
 
 
 # Reference peak energies (keV) for common natural background
@@ -80,8 +77,9 @@ def find_peaks_for_calibration(counts, min_height=10, min_prominence=5,
     properties : dict
         Peak properties (heights, prominences, etc.)
     """
-    peaks, properties = find_peaks(counts, height=min_height,
-                                   prominence=min_prominence, distance=5)
+    from scipy.signal import find_peaks as _find_peaks
+    peaks, properties = _find_peaks(counts, height=min_height,
+                                    prominence=min_prominence, distance=5)
 
     # Sort by height (most prominent first)
     sorted_indices = np.argsort(properties['peak_heights'])[::-1]
@@ -92,6 +90,7 @@ def find_peaks_for_calibration(counts, min_height=10, min_prominence=5,
     peak_prominences = properties['prominences'][sorted_indices][:max_peaks]
 
     if plot:
+        import matplotlib.pyplot as plt
         fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(14, 8))
         channels = np.arange(len(counts))
 
@@ -179,6 +178,7 @@ def find_peaks_in_windows(counts, windows, plot=True):
         })
 
     if plot:
+        import matplotlib.pyplot as plt
         fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(14, 8))
         channels = np.arange(len(counts))
 
@@ -317,6 +317,7 @@ def plot_calibration_fit(fit_info):
     fit_info : dict
         Output from calibrate_spectrum()
     """
+    import matplotlib.pyplot as plt
     fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(10, 8))
 
     # Fit plot
@@ -389,6 +390,7 @@ def plot_calibrated_spectrum(counts, calibration, calibration_points=None,
     figsize : tuple
         Figure size
     """
+    import matplotlib.pyplot as plt
     energies = apply_calibration(counts, calibration)
 
     fig, (ax1, ax2) = plt.subplots(2, 1, figsize=figsize)

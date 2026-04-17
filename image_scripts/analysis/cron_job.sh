@@ -8,6 +8,10 @@ MAIL=/var/mail/dosenet/radwatch-airmonitor
 #PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/games
 PATH=/home/dosenet/anaconda3/bin:/home/dosenet/anaconda3/condabin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/games:/usr/local/games:/snap/bin:/snap/bin
 PWD=/home/dosenet/radwatch-airmonitor
+
+# Activate the radwatch conda environment
+eval "$(conda shell.bash hook)"
+conda activate radwatch
 LANG=en_US.UTF-8
 SHLVL=1
 HOME=/home/dosenet/radwatch-airmonitor

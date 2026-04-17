@@ -5,8 +5,7 @@
 # analysis pipeline. Assumes Ubuntu/Debian with Anaconda3 installed.
 #
 # Usage:
-#   chmod +x setup.sh
-#   ./setup.sh
+#   bash setup.sh
 #
 # After running this script you still need to:
 #   1. Set up Dropbox sync for the spectral data directory
@@ -18,6 +17,7 @@ set -euo pipefail
 REPO_DIR="$(cd "$(dirname "$0")" && pwd)"
 DATA_DIR="${REPO_DIR}/data"
 ANALYSIS_DIR="${REPO_DIR}/image_scripts/analysis"
+CONDA_ENV="radwatch"
 
 echo "========================================"
 echo "RadWatch Air Monitor - Server Setup"
@@ -25,38 +25,45 @@ echo "========================================"
 echo "Repository: ${REPO_DIR}"
 echo ""
 
-# ---- 1. Check Python ----
-echo "--- Checking Python environment ---"
-if ! command -v python3 &>/dev/null; then
-    echo "ERROR: python3 not found. Install Anaconda3 or Python 3.8+."
+# ---- 1. Check conda ----
+echo "--- Checking conda ---"
+if ! command -v conda &>/dev/null; then
+    echo "ERROR: conda not found. Install Anaconda3 or Miniconda."
     exit 1
 fi
-PYTHON_VERSION=$(python3 --version 2>&1)
-echo "Found: ${PYTHON_VERSION}"
+echo "Found: $(conda --version)"
 
-# ---- 2. Install Python dependencies ----
+# ---- 2. Create / update conda environment ----
 echo ""
-echo "--- Installing Python dependencies ---"
-pip install --quiet numpy scipy matplotlib h5py pandas Pillow pytz becquerel
-echo "Core packages installed."
+echo "--- Setting up conda environment '${CONDA_ENV}' ---"
+if conda env list | grep -q "^${CONDA_ENV} "; then
+    echo "Environment '${CONDA_ENV}' already exists, updating..."
+    conda env update -f "${REPO_DIR}/environment.yml" --prune
+else
+    echo "Creating environment '${CONDA_ENV}'..."
+    conda env create -f "${REPO_DIR}/environment.yml"
+fi
 
-# Optional: xylib (may fail on some systems, not critical)
-echo "Attempting to install xylib-py (optional)..."
-pip install --quiet xylib-py 2>/dev/null && echo "xylib-py installed." || echo "WARNING: xylib-py not available (optional, cnf_parser_standalone is used instead)"
+# Activate the environment for the rest of setup
+eval "$(conda shell.bash hook)"
+conda activate "${CONDA_ENV}"
+echo "Activated: ${CONDA_ENV}"
 
-# Optional: future (Python 2/3 compat, only needed by some legacy scripts)
-pip install --quiet future 2>/dev/null && echo "future installed." || true
+PYTHON_VERSION=$(python3 --version 2>&1)
+echo "Python: ${PYTHON_VERSION}"
 
 echo ""
 echo "--- Installed package versions ---"
 python3 -c "
 import numpy; print(f'  numpy:      {numpy.__version__}')
-import scipy; print(f'  scipy:      {scipy.__version__}')
 import matplotlib; print(f'  matplotlib: {matplotlib.__version__}')
 import h5py; print(f'  h5py:       {h5py.__version__}')
 import pandas; print(f'  pandas:     {pandas.__version__}')
-import becquerel; print(f'  becquerel:  {becquerel.__version__}')
 import pytz; print(f'  pytz:       {pytz.__version__}')
+try:
+    import scipy; print(f'  scipy:      {scipy.__version__} (optional)')
+except ImportError:
+    print('  scipy:      not installed (optional, for notebooks)')
 "
 
 # ---- 3. Create data directory ----
@@ -132,7 +139,7 @@ echo "Made cron_job.sh executable"
 
 # ---- 9. Test import of core modules ----
 echo ""
-echo "--- Testing Python imports ---"
+echo "--- Testing Python imports (in '${CONDA_ENV}' env) ---"
 cd "${ANALYSIS_DIR}"
 python3 -c "
 import sys
@@ -185,5 +192,8 @@ echo "     tail -50 ${DATA_DIR}/pipeline.log"
 echo ""
 echo "  4. Check that plots were generated:"
 echo "     ls -la ${ANALYSIS_DIR}/rooftop_tmp/*.png"
+echo ""
+echo "  For crontab, ensure the conda env is activated:"
+echo "     The cron_job.sh script handles this automatically."
 echo ""
 echo "See docs/architecture.md for full system documentation."

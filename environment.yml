@@ -1,0 +1,19 @@
+# RadWatch Air Monitor - Conda Environment
+# Usage:
+#   conda env create -f environment.yml
+#   conda activate radwatch
+name: radwatch
+channels:
+  - defaults
+  - conda-forge
+dependencies:
+  - python>=3.9
+  # Required by active pipeline
+  - numpy
+  - h5py
+  - matplotlib
+  - pandas
+  - pillow
+  - pytz
+  # Optional: only needed for interactive calibration notebooks
+  # - scipy

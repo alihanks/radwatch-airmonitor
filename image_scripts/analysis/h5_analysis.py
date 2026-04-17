@@ -68,9 +68,6 @@ def time_indicies(timestamps,timed):
     return ind
             
 # color palette
-#with open('../etc/colr/col_scheme.dat', 'r') as f:
-#    col_pal = f.readlines()
-#col_pal = [el.replace('\n', '') for el in col_pal]
 col_pal = ['#00B2A5',
             '#D9661F',
             '#00B0DA',
@@ -160,13 +157,6 @@ col.set_eff(os.path.join(PROJECT_ROOT, 'image_scripts', 'analysis', 'roof.ecc'))
 col_comp.add_roi(os.path.join(PROJECT_ROOT, 'image_scripts', 'analysis', 'roi.dat'))
 
 
-
-#eff=col.get_eff_for_binning(ax); 
-#for x in range(0,len(spec)):
-#    if(eff[x]==0.):
-#        spec[x]=0;
-#        continue;
-#    spec[x]=spec[x]/eff[x];
 
 # roi report
 res = np.zeros((len(col.rois), 2))
@@ -258,13 +248,6 @@ for x in time_utils.time_wins:
 clf()
 cla()
 
-#weather_data
-#for x in range(0,len(weather[1,:])):
-#    wea=4;
-#    max_=np.max( weather[:,wea] );
-#    tmp=weather[:,wea]/max_;
-#    plot(timestamps,tmp);
-
 #count rate array — use stored ROI data if available, else compute on-the-fly
 if 'roi_counts' in data_group:
     roi_array = data_group['roi_counts'][:]
@@ -324,7 +307,6 @@ else:
     weather_solar = list(weather[:, 2])
 
 #plot all isotopes
-#gs=matplotlib.gridspec.GridSpec(2,1,height_ratios=[1,3]);
 axarr = [subplot2grid((5, 4), (0, 0), colspan=4), subplot2grid((5, 4), (1, 0), rowspan=3, colspan=4),
          subplot2grid((5, 4), (4, 0), rowspan=1, colspan=4)]
 gcf().add_subplot(axarr[0])
@@ -411,7 +393,6 @@ for x in time_utils.time_wins:
     setp(new_axis.xaxis.get_majorticklabels(), rotation=45, ha="right")
     savefig(os.path.join(DATA_DIR, 'trimmed_' + time_utils.time_wins_str[p] + '.png'), transparent=False, bbox_inches='tight')
     p += 1
-#weather_utils.draw_windrose(weather[:,3],weather[:,4],'hour');
 
 # tmp plot of rainfall
 clf()
