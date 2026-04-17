@@ -24,7 +24,6 @@ def gather_data():
     data_frame = data_frame[3].iloc[1:]
 
     # wind direction conversion
-    pd.set_option('future.no_silent_downcasting', True) # to suppress behavior warning
     data_frame.loc[:, 'Wind'] = data_frame.loc[:, 'Wind'].replace(NSEW_TO_DEG)
 
     # time conversion
