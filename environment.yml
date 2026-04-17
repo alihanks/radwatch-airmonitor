@@ -2,19 +2,22 @@
 # Usage:
 #   conda env create -f environment.yml
 #   conda activate radwatch
+#
+# Versions pinned to known-working server env (2026-04-17).
+# Update with: conda list > conda_list.txt
 name: radwatch
 channels:
   - defaults
   - conda-forge
 dependencies:
-  - python>=3.9,<3.13
+  - python>=3.12,<3.13
   # Required by active pipeline
-  - numpy
-  - h5py
-  - matplotlib
-  - pandas
-  - pillow
-  - pytz
-  - lxml
+  - numpy>=2.4,<2.5
+  - h5py>=3.15,<3.16
+  - matplotlib>=3.10,<3.11
+  - pandas>=3.0,<3.1
+  - pillow>=12.1,<12.2
+  - pytz>=2026.1
+  - lxml>=5.3,<5.4
   # Optional: only needed for interactive calibration notebooks
   # - scipy
