@@ -81,10 +81,4 @@ cp ${DATA_DIR}/weather_sorted.csv ./rooftop_tmp/ 2>/dev/null
 
 echo ""
 echo "--- Deploying via SFTP ---"
-if [ -z "$RADWATCH_SFTP_PASS" ]; then
-    echo "WARNING: RADWATCH_SFTP_PASS not set, skipping SFTP upload"
-    echo "  Set it with: export RADWATCH_SFTP_PASS='your-password'"
-    echo "  Or add to crontab: RADWATCH_SFTP_PASS=your-password"
-else
-    lftp -e "set sftp:auto-confirm yes; mirror -Rnv /home/dosenet/radwatch-airmonitor/image_scripts/analysis/rooftop_tmp /test/; quit;" -u coeradwatch-RADWATCH,"${RADWATCH_SFTP_PASS}" sftp://coeradwatch.sftp.wpengine.com:2222
-fi
+bash /home/dosenet/radwatch-airmonitor/image_scripts/analysis/deploy.sh
