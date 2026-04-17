@@ -776,12 +776,14 @@ class SampleCollection:
                 continue
         
         print(f"sample_collection::build_collection_incremental: processed {files_processed} new files")
-        
-        # Save the last processed file marker
-        if len(fil_list) > 0:
+
+        # Save the last processed file marker (only if files were actually processed)
+        if files_processed > 0:
             with open(last_processed_marker, 'w') as f:
-                f.write(fil_list[-1])
-            print(f"Updated last processed marker to: {fil_list[-1]}")
+                f.write(fil_list[end_index - 1])
+            print(f"Updated last processed marker to: {fil_list[end_index - 1]}")
+        elif len(fil_list) > 0:
+            print(f"No files successfully processed, marker NOT updated")
 
 
     def merge_collection(self, other_collection):

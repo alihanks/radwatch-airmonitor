@@ -127,6 +127,29 @@ The RadWatch air monitor is a rooftop gamma-ray spectroscopy system at UC Berkel
   - Weather plotted once on its own merged timeline (moved out of the ROI loop where it was redundantly re-plotted per isotope)
   - Graceful fallback: if `weather_sorted.csv` doesn't exist, uses HDF5-only weather on original radiation timestamps
 
+### 2026-04-15: Add Pipeline Logging & Fix Marker Bug
+
+**Problem:** The cron job had no logging — all Python stdout/stderr was lost. When the pipeline failed or produced stale output, there was no way to diagnose why without being at the server. Additionally, `last_processed.txt` was being updated even when all CNF file processing failed, causing the pipeline to skip those files permanently on subsequent runs.
+
+**Changes:**
+- **`cron_job.sh` — Add comprehensive logging**
+  - All output (stdout + stderr) redirected to `data/pipeline.log` via `exec >> "$LOGFILE" 2>&1`
+  - Log rotation: old log moved to `pipeline.log.old` when over 1MB
+  - Each pipeline step (weather_gatherer, raw_analysis, h5_analysis) logs its exit code
+  - Diagnostic summary after each run: Dropbox directory count, last_processed marker, rebin.h5 size, PNG count
+  - Warnings printed when scripts fail
+
+- **`sample_collection.py` — Fix `last_processed.txt` marker bug**
+  - Marker now only updated when `files_processed > 0` (previously updated whenever `fil_list` was non-empty, even if every file errored)
+  - Prevents the marker from advancing past files that failed to process
+
+**Diagnostic checklist (when pipeline isn't updating):**
+1. SSH in and check `data/pipeline.log` for errors
+2. Verify Dropbox is syncing: `ls '/home/dosenet/Dropbox/UCB Air Monitor/Data/Roof/current/' | tail`
+3. Check `data/last_processed.txt` — if it points to a file in a removed directory, delete it
+4. Check `data/rebin.h5` exists and has recent mtime
+5. Check `data/*.png` exist after a manual run
+
 ---
 
 ## Known Issues & Future Work
@@ -146,3 +169,12 @@ When making changes that affect the HDF5 schema or channel count:
 4. Run `h5_analysis.py` to regenerate all plots
 
 The cron job (`cron_job.sh`) runs both scripts and converts output PNGs for the web dashboard.
+
+**Logs:** All pipeline output goes to `data/pipeline.log`. Check this first when diagnosing issues.
+
+**Key paths on server:**
+- Spectral data (Dropbox): `/home/dosenet/Dropbox/UCB Air Monitor/Data/Roof/current/`
+- Weather station CSV: `/home/dosenet/radwatch-airmonitor/weatherhawk.csv`
+- Pipeline output: `/home/dosenet/radwatch-airmonitor/data/`
+- Cron job: `/home/dosenet/radwatch-airmonitor/image_scripts/analysis/cron_job.sh`
+- SFTP staging: `/home/dosenet/radwatch-airmonitor/image_scripts/analysis/rooftop_tmp/`

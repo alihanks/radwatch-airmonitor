@@ -15,15 +15,57 @@ LOGNAME=dosenet/radwatch-airmonitor
 DISPLAY=localhost:10.0
 #_=/usr/bin/env
 
-date;
+DATA_DIR=/home/dosenet/radwatch-airmonitor/data
+LOGFILE=${DATA_DIR}/pipeline.log
+
+# Rotate log if over 1MB
+if [ -f "$LOGFILE" ] && [ $(stat -f%z "$LOGFILE" 2>/dev/null || stat -c%s "$LOGFILE" 2>/dev/null) -gt 1048576 ]; then
+    mv "$LOGFILE" "${LOGFILE}.old"
+fi
+
+exec >> "$LOGFILE" 2>&1
+
+echo ""
+echo "========================================"
+echo "Pipeline run: $(date)"
+echo "========================================"
 
 cd /home/dosenet/radwatch-airmonitor/image_scripts/analysis/
-pwd > /home/dosenet/radwatch-airmonitor/image_scripts/analysis/out.txt
+
+echo "--- weather_gatherer.py ---"
 python3 /home/dosenet/radwatch-airmonitor/image_scripts/weather_gatherer.py
+WGATHER_EXIT=$?
+echo "weather_gatherer.py exit code: $WGATHER_EXIT"
+
+echo ""
+echo "--- raw_analysis.py ---"
 python3 /home/dosenet/radwatch-airmonitor/image_scripts/analysis/raw_analysis.py
+RAW_EXIT=$?
+echo "raw_analysis.py exit code: $RAW_EXIT"
+
+echo ""
+echo "--- h5_analysis.py ---"
 python3 /home/dosenet/radwatch-airmonitor/image_scripts/analysis/h5_analysis.py
+H5_EXIT=$?
+echo "h5_analysis.py exit code: $H5_EXIT"
+
+# Check for generated output before proceeding
+echo ""
+if [ $RAW_EXIT -ne 0 ]; then
+    echo "WARNING: raw_analysis.py failed (exit $RAW_EXIT), plots may be stale"
+fi
+if [ $H5_EXIT -ne 0 ]; then
+    echo "WARNING: h5_analysis.py failed (exit $H5_EXIT), skipping image deploy"
+fi
+
+echo "--- Dropbox status ---"
+ls -d "/home/dosenet/Dropbox/UCB Air Monitor/Data/Roof/current/"*/ 2>/dev/null | tail -5
+echo "Total date dirs: $(ls -d '/home/dosenet/Dropbox/UCB Air Monitor/Data/Roof/current/'*/ 2>/dev/null | wc -l)"
+echo "last_processed.txt: $(cat ${DATA_DIR}/last_processed.txt 2>/dev/null || echo 'MISSING')"
+echo "rebin.h5 size: $(ls -lh ${DATA_DIR}/rebin.h5 2>/dev/null | awk '{print $5}' || echo 'MISSING')"
+echo "Generated PNGs: $(ls ${DATA_DIR}/*.png 2>/dev/null | wc -l)"
+
 #python /home/dosenet/radwatch-airmonitor/image_scripts/analysis/stage_h5.py
-DATA_DIR=/home/dosenet/radwatch-airmonitor/data
 convert -geometry 300x220+0+0 ${DATA_DIR}/iso_One_Day.png ${DATA_DIR}/iso_One_Day_small.png
 mkdir -p "rooftop_tmp"
 mv ${DATA_DIR}/*.png ./rooftop_tmp
@@ -32,6 +74,7 @@ mv ${DATA_DIR}/weather_sorted.csv ./rooftop_tmp
 #tar cvf rooftop.tar rooftop_tmp
 #scp rooftop.tar rpavlovs@kepler.berkeley.edu:/tmp
 #ssh rpavlovs@kepler.berkeley.edu 'bash -s' < unpacking_script.sh
-env >> /home/dosenet/radwatch-airmonitor/image_scripts/analysis/out.txt
 #kill $SSH_AGENT_PID
+echo ""
+echo "--- Deploying via SFTP ---"
 lftp -e "set sftp:auto-confirm yes; mirror -Rnv /home/dosenet/radwatch-airmonitor/image_scripts/analysis/rooftop_tmp /test/; quit;" -u coeradwatch-RADWATCH,'x9DvsvP9gbVWT9F' sftp://coeradwatch.sftp.wpengine.com:2222
