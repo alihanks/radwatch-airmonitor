@@ -15,5 +15,6 @@ dependencies:
   - pandas
   - pillow
   - pytz
+  - lxml
   # Optional: only needed for interactive calibration notebooks
   # - scipy

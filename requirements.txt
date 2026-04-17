@@ -8,6 +8,7 @@ matplotlib
 pandas
 Pillow
 pytz
+lxml
 
 # Optional: only needed for interactive calibration notebooks
 # scipy
