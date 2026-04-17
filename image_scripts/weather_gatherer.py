@@ -2,6 +2,7 @@ import re
 import pandas as pd
 import datetime
 import math
+import os
 
 CSV_PATH = '/home/dosenet/radwatch-airmonitor/weatherhawk.csv'
 
@@ -13,15 +14,50 @@ NSEW_TO_DEG = {'N':180,'S':0,'E':270,'W':90,
                'SSE':337.5,'SSW':22.5,
                'WNW':112.5,'WSW':67.5}
 
-def gather_data():
-    #data grabbing
-    date = datetime.date.today()
-    web = "https://www.wunderground.com/dashboard/pws/{}/table/{}/{}/daily"
-    station = "KCABERKE272"
-    url = web.format(station,date,date)
-    data_frame = pd.read_html(url,header=0)
-    print(data_frame[1])
-    data_frame = data_frame[3].iloc[1:]
+WU_URL = "https://www.wunderground.com/dashboard/pws/{}/table/{}/{}/daily"
+WU_STATION = "KCABERKE272"
+
+
+def get_last_csv_date():
+    """Read the last timestamp in weatherhawk.csv and return its date."""
+    if not os.path.exists(CSV_PATH) or os.path.getsize(CSV_PATH) == 0:
+        return None
+    try:
+        # Read just the second column (Date Time) to find the last entry
+        df = pd.read_csv(CSV_PATH, usecols=[1], header=0)
+        if len(df) == 0:
+            return None
+        last_val = df.iloc[-1, 0]
+        last_dt = pd.to_datetime(last_val)
+        return last_dt.date()
+    except Exception as e:
+        print(f"Could not determine last CSV date: {e}")
+        return None
+
+
+def scrape_day(date):
+    """Scrape weather data for a single date from WeatherUnderground.
+
+    Returns a DataFrame in the weatherhawk.csv format, or None on failure.
+    """
+    url = WU_URL.format(WU_STATION, date, date)
+    print(f"Fetching weather for {date}: {url}")
+
+    try:
+        tables = pd.read_html(url, header=0)
+    except Exception as e:
+        print(f"Failed to fetch {date}: {e}")
+        return None
+
+    if len(tables) < 4:
+        print(f"Unexpected table count for {date}: {len(tables)} (expected >= 4)")
+        return None
+
+    data_frame = tables[3].iloc[1:]
+
+    if len(data_frame) == 0:
+        print(f"No data rows for {date}")
+        return None
 
     # wind direction conversion (NaN/missing values become NaN degrees)
     data_frame['Wind'] = data_frame['Wind'].map(
@@ -29,47 +65,81 @@ def gather_data():
     )
 
     # time conversion
-    data_frame['Time'] = pd.to_datetime(str(date) + ' ' + data_frame['Time'], format='%Y-%m-%d %I:%M %p')
+    data_frame['Time'] = pd.to_datetime(
+        str(date) + ' ' + data_frame['Time'],
+        format='%Y-%m-%d %I:%M %p'
+    )
 
     # clean data of units
-    measurement_cols = list(set(data_frame.columns) - {'Time'}) # excluding columns for measurement extraction
+    measurement_cols = list(set(data_frame.columns) - {'Time'})
     data_frame[measurement_cols] = data_frame[measurement_cols].map(get_measurement)
 
-    # assemble and append
-    data_frame = assemble(data_frame)
-    data_frame.to_csv(CSV_PATH, mode='a', header=False, index=False)
+    # assemble into weatherhawk.csv format
+    return assemble(data_frame)
 
-    # printout
-    print(data_frame.tail())
+
+def gather_data():
+    """Scrape weather data for all missing days since last CSV entry through today."""
+    today = datetime.date.today()
+    last_date = get_last_csv_date()
+
+    if last_date is None:
+        # No existing data — just get today
+        print("No existing weather data found, fetching today only")
+        start_date = today
+    elif last_date >= today:
+        # Already up to date
+        print(f"Weather data already current (last entry: {last_date})")
+        start_date = today  # Still re-fetch today to get latest readings
+    else:
+        # Backfill from the day after the last entry
+        start_date = last_date + datetime.timedelta(days=1)
+        gap_days = (today - last_date).days
+        print(f"Last weather data: {last_date}, backfilling {gap_days} day(s)")
+
+    # Scrape each missing day
+    date = start_date
+    total_rows = 0
+    while date <= today:
+        df = scrape_day(date)
+        if df is not None and len(df) > 0:
+            df.to_csv(CSV_PATH, mode='a', header=False, index=False)
+            total_rows += len(df)
+            print(f"  {date}: {len(df)} rows appended")
+        date += datetime.timedelta(days=1)
+
+    print(f"Weather gathering complete: {total_rows} total rows appended")
+
 
 def get_measurement(entry):
-    match = re.search(r'[-+]?\d*\.?\d+', str(entry))        # using regex to extract the measurement
+    match = re.search(r'[-+]?\d*\.?\d+', str(entry))
     return float(match.group()) if match else entry
 
+
 def assemble(df):
-    dict = {}
-    dict['Record Id'] = -1                      # default val for unspecified entry num
-    dict['Date Time'] = df['Time']
-    dict['Air Temp Avg'] = df['Temperature']
-    dict['Air Temp Min'] = df['Temperature']
-    dict['Air Temp Min Time'] = df['Time']
-    dict['Air Temp Max'] = df['Temperature']    # seems min, max, avg temp are shared (is it a single data point?)
-    dict['Air Temp Max Time'] = df['Time']      # this info unavailable, using current time as proxy
-    dict['Humidity'] = df['Humidity']
-    dict['Barometer'] = df['Pressure']
-    dict['Battery'] = math.nan
-    dict['MinBattery'] = math.nan               # these labels don't seem to correspond with anything
-    dict['ETo'] = math.nan
-    dict['Rain Yearly'] = math.nan              # a daily precip. accum. measurement exists
-    dict['Solar Avg'] = df['Solar']             # this in w/m^2, does it require conversion?
-    dict['Wind Speed Avg'] = df['Speed']
-    dict['Wind Speed Max'] = df['Gust']         # assuming gust = max wind speed
-    dict['Wind Speed Max Time'] = df['Time']    # this info unavailable, using current time as proxy
-    dict['Wind Speed Avg 2'] = df['Speed']      # a duplicate column exists for avg wind speed
-    dict['Wind Direction'] = df['Wind']
+    result = {}
+    result['Record Id'] = -1
+    result['Date Time'] = df['Time']
+    result['Air Temp Avg'] = df['Temperature']
+    result['Air Temp Min'] = df['Temperature']
+    result['Air Temp Min Time'] = df['Time']
+    result['Air Temp Max'] = df['Temperature']
+    result['Air Temp Max Time'] = df['Time']
+    result['Humidity'] = df['Humidity']
+    result['Barometer'] = df['Pressure']
+    result['Battery'] = math.nan
+    result['MinBattery'] = math.nan
+    result['ETo'] = math.nan
+    result['Rain Yearly'] = math.nan
+    result['Solar Avg'] = df['Solar']
+    result['Wind Speed Avg'] = df['Speed']
+    result['Wind Speed Max'] = df['Gust']
+    result['Wind Speed Max Time'] = df['Time']
+    result['Wind Speed Avg 2'] = df['Speed']
+    result['Wind Direction'] = df['Wind']
 
-    df = pd.DataFrame(dict)
-    return df
+    return pd.DataFrame(result)
 
-if(__name__=='__main__'):
+
+if __name__ == '__main__':
     gather_data()
