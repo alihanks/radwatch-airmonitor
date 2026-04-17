@@ -71,16 +71,20 @@ echo "last_processed.txt: $(cat ${DATA_DIR}/last_processed.txt 2>/dev/null || ec
 echo "rebin.h5 size: $(ls -lh ${DATA_DIR}/rebin.h5 2>/dev/null | awk '{print $5}' || echo 'MISSING')"
 echo "Generated PNGs: $(ls ${DATA_DIR}/*.png 2>/dev/null | wc -l)"
 
-#python /home/dosenet/radwatch-airmonitor/image_scripts/analysis/stage_h5.py
-convert -geometry 300x220+0+0 ${DATA_DIR}/iso_One_Day.png ${DATA_DIR}/iso_One_Day_small.png
+# Stage output files for deployment
 mkdir -p "rooftop_tmp"
-mv ${DATA_DIR}/*.png ./rooftop_tmp
-mv ${DATA_DIR}/weather_sorted.csv ./rooftop_tmp
-#mv weather_bq.csv ./rooftop_tmp
-#tar cvf rooftop.tar rooftop_tmp
-#scp rooftop.tar rpavlovs@kepler.berkeley.edu:/tmp
-#ssh rpavlovs@kepler.berkeley.edu 'bash -s' < unpacking_script.sh
-#kill $SSH_AGENT_PID
+convert -geometry 300x220+0+0 ${DATA_DIR}/iso_One_Day.png ${DATA_DIR}/iso_One_Day_small.png 2>/dev/null || echo "WARNING: convert failed (imagemagick)"
+
+# Copy (not move) PNGs and weather CSV to staging directory
+cp ${DATA_DIR}/*.png ./rooftop_tmp/ 2>/dev/null
+cp ${DATA_DIR}/weather_sorted.csv ./rooftop_tmp/ 2>/dev/null
+
 echo ""
 echo "--- Deploying via SFTP ---"
-lftp -e "set sftp:auto-confirm yes; mirror -Rnv /home/dosenet/radwatch-airmonitor/image_scripts/analysis/rooftop_tmp /test/; quit;" -u coeradwatch-RADWATCH,'x9DvsvP9gbVWT9F' sftp://coeradwatch.sftp.wpengine.com:2222
+if [ -z "$RADWATCH_SFTP_PASS" ]; then
+    echo "WARNING: RADWATCH_SFTP_PASS not set, skipping SFTP upload"
+    echo "  Set it with: export RADWATCH_SFTP_PASS='your-password'"
+    echo "  Or add to crontab: RADWATCH_SFTP_PASS=your-password"
+else
+    lftp -e "set sftp:auto-confirm yes; mirror -Rnv /home/dosenet/radwatch-airmonitor/image_scripts/analysis/rooftop_tmp /test/; quit;" -u coeradwatch-RADWATCH,"${RADWATCH_SFTP_PASS}" sftp://coeradwatch.sftp.wpengine.com:2222
+fi
