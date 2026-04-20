@@ -229,6 +229,16 @@ The RadWatch air monitor is a rooftop gamma-ray spectroscopy system at UC Berkel
 4. Let cron run, or invoke `raw_analysis.py` + `h5_analysis.py` manually.
 5. Inspect new `iso_One_Month.png` — residual K-40 dips should flatten to the ~0.33 steady-state line.
 
+### 2026-04-20: Fix Isotope Labels on "Most Recent Spectrum" Plot
+
+**Problem:** The `most_recent_spectra.png` plot showed isotope-name labels pointing to the wrong energies — several labels ("Pb212", "Pb214", "Be7", "Tl208", "Cs134", "Bi214", "Cs137") clustered in the 200–700 keV range regardless of where the actual peaks sit. Symptom of calibration drift: labels were anchored to hardcoded channel numbers, not energies.
+
+**Root cause:** `h5_analysis.py` was loading ROIs from *two* files — the current energy-based `roi_energy.dat` (into `col`) and the legacy channel-based `roi.dat` (into `col_comp`). The ROI highlight overlay used `col` (correct), but the `annotate` loop that places the isotope text labels iterated over `col_comp` (wrong — channel numbers are stale when calibration changes). This was a migration leftover from the Feb 18 `fa73c03` switch to energy-based ROIs — the logbook from that date noted "`roi.dat` still exists for legacy/comparison use," and this plot was silently depending on it.
+
+**Change (`h5_analysis.py`):** Drop `col_comp` and the `roi.dat` load. Merge the annotation logic into the existing `col.rois` loop so labels and highlight overlay share the same (calibration-aware) ROI channels. Also drops the redundant yellow `roi_comp` overlay — it was visual noise duplicating the pink `roi_` overlay at wrong positions.
+
+**Scope:** Only affects `most_recent_spectra.png`. No impact on isotope time-series plots (`iso_*.png`), QA, HDF5 schema, or the K-40 livetime correction. `roi.dat` is still present in the repo for the verification notebook; not removed.
+
 ---
 
 ## Known Issues & Future Work

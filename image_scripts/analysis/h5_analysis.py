@@ -147,16 +147,12 @@ spec = spectra[-1, :]
 # spec = np.sum(spectra[:300, :], axis=0)
 
 col = sample_collection.SampleCollection()
-col_comp = sample_collection.SampleCollection()
 calibration = read_calibration_file(os.path.join(PROJECT_ROOT, 'image_scripts', 'calibration', 'calibration_coefficients.txt'))
 
 # energy axis generation using external calibration file (matches ROI channel mapping)
 ax = [calibration[0] + calibration[1] * (x + 1) for x in range(len(spec))]
 col.add_roi_energy(os.path.join(PROJECT_ROOT, 'image_scripts', 'analysis', 'roi_energy.dat'), calibration)
 col.set_eff(os.path.join(PROJECT_ROOT, 'image_scripts', 'analysis', 'roof.ecc'))
-col_comp.add_roi(os.path.join(PROJECT_ROOT, 'image_scripts', 'analysis', 'roi.dat'))
-
-
 
 # roi report
 res = np.zeros((len(col.rois), 2))
@@ -167,15 +163,14 @@ for el in col.rois:
     res[k, :] = counts
     k += 1
 
-#printing rois
+# Build highlighted ROI overlay and place isotope labels at peak positions.
+# Channels come from the energy-based ROI definitions, so labels track the
+# current calibration rather than the legacy channel-hardcoded roi.dat.
 roi_ = np.zeros(len(spec))
-roi_comp = np.zeros(len(spec))
 lst_peak = 0
 lst_peak_height = 0
 for el in col.rois:
     roi_[el.peak[0]:el.peak[1]] = spec[el.peak[0]:el.peak[1]]
-for el in col_comp.rois:
-    roi_comp[el.peak[0]:el.peak[1]] = spec[el.peak[0]:el.peak[1]]
     try:
         super_tmp = el.peak[0] + np.argmax(spec[el.peak[0]:el.peak[1]])
         if el.peak[0] - lst_peak < 100:
@@ -191,13 +186,12 @@ for el in col_comp.rois:
         print(e)
         print(f"Spectrum object: {el}")
         shift = 80
-    annotate(el.isotope, (ax[super_tmp], spec[super_tmp]), xytext=(0, shift), textcoords='offset points', rotation=90, 
+    annotate(el.isotope, (ax[super_tmp], spec[super_tmp]), xytext=(0, shift), textcoords='offset points', rotation=90,
              ha='center', va='center', arrowprops=dict(width=0.25, headwidth=0, shrink=0.05))
     lst_peak = el.peak[1]
     lst_peak_height = spec[super_tmp]
 
 semilogy(ax[30:], spec[30:], col_pal[5])
-semilogy(ax, roi_comp, col_pal[6])
 semilogy(ax, roi_, col_pal[8])
 if plot_most_recent_spec:
     show()
