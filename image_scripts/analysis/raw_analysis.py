@@ -251,13 +251,14 @@ if existing_data_loaded:
         k40_roi = rois_lt[K40_ROI_INDEX]
         if col.k40_median_counts is not None:
             estimate_livetimes_from_k40(col_new.collection, k40_roi, col.k40_median_counts)
-            k40_median = col.k40_median_counts
+            k40_baseline = col.k40_median_counts
         else:
-            print("WARNING: No stored K-40 median found in HDF5, computing from new data")
+            print("WARNING: No stored K-40 baseline found in HDF5, computing from new data")
             k40_counts = compute_k40_gross_counts(col_new.collection, k40_roi)
             k40_median = float(np.median(k40_counts))
-            print(f"Computed K-40 median counts from new data: {k40_median:.2f}")
-            estimate_livetimes_from_k40(col_new.collection, k40_roi, k40_median)
+            k40_baseline = float(np.percentile(k40_counts, 75))
+            print(f"K-40 gross counts baseline: median={k40_median:.2f}, p75={k40_baseline:.2f} (using p75)")
+            estimate_livetimes_from_k40(col_new.collection, k40_roi, k40_baseline)
 
         # Rebin new data
         print("\nRebinning new data...")
@@ -299,7 +300,7 @@ if existing_data_loaded:
         # Write updated HDF5 with ROI data
         print("\nWriting updated database...")
         col.write_hdf(hdf5_file, roi_data=full_roi_array, roi_labels=roi_labels,
-                      k40_median_counts=k40_median)
+                      k40_median_counts=k40_baseline)
         print('Database updated')
     else:
         print("\nNo new files to process")
@@ -320,9 +321,14 @@ else:
         rois_lt = load_rois_for_qa()
         k40_roi = rois_lt[K40_ROI_INDEX]
         k40_counts = compute_k40_gross_counts(col.collection, k40_roi)
+        # Baseline is the 75th percentile rather than the median: the raw-spectrum
+        # K-40 count distribution is bimodal (full-livetime vs truncated), so the
+        # median is dragged down by the truncated tail -- the very spectra we're
+        # trying to correct. p75 sits in the full-livetime cluster.
         k40_median = float(np.median(k40_counts))
-        print(f"K-40 median gross counts: {k40_median:.2f}")
-        estimate_livetimes_from_k40(col.collection, k40_roi, k40_median)
+        k40_baseline = float(np.percentile(k40_counts, 75))
+        print(f"K-40 gross counts baseline: median={k40_median:.2f}, p75={k40_baseline:.2f} (using p75)")
+        estimate_livetimes_from_k40(col.collection, k40_roi, k40_baseline)
 
         # Rebin
         print("\nRebinning data...")
@@ -347,7 +353,7 @@ else:
         # Write HDF5 with ROI data
         print("\nWriting database...")
         col.write_hdf(hdf5_file, roi_data=roi_array, roi_labels=roi_labels,
-                      k40_median_counts=k40_median)
+                      k40_median_counts=k40_baseline)
         print('Database written')
     else:
         print("No data to process")

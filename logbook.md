@@ -206,6 +206,29 @@ The RadWatch air monitor is a rooftop gamma-ray spectroscopy system at UC Berkel
 
 - **`f1d14f8` - Remove stray `~` file** at the repo root. Leftover no-op script, likely from a shell redirection to `~` during an earlier `rtpavlovsk21 → dosenet` find-and-replace. Harmless but confusing.
 
+### 2026-04-20: Fix K-40 Baseline Bias in Livetime Correction
+
+**Problem:** Residual non-physical K-40 dips (0.17–0.25 cts/s vs steady-state ~0.33) remained in the month plot even though `estimate_livetimes_from_k40` was running and scaling livetimes down. Tracing a specific dip bin showed the correction *was* applied — the livetime dropped from 3600s to ~1200s — but the K-40 rate still came out below nominal.
+
+**Root cause:** The baseline reference `k40_median_counts` (used as the denominator of the K-40 ratio that drives the correction) was computed as `np.median` over *all* raw spectra, including the short-livetime truncated ones the correction is designed to handle. The distribution is bimodal (full-livetime cluster near ~100 counts, truncated tail trailing toward 0), so the median sits in the valley (~75) instead of on the full-livetime peak. That biases the baseline ~30% low, which makes the correction systematically *under-correct* by the same factor.
+
+**Evidence from `rebin.h5`:**
+- Stored `k40_median_counts = 74.86`, implying "nominal" rate `= 74.86/300 ≈ 0.25` cts/s.
+- Observed hourly median K-40 rate: **0.342** cts/s.
+- Ratio 0.342 / 0.25 = **1.37** ≈ ratio by which the baseline needs to rise (i.e. true baseline ≈ 103 counts, not 75).
+- Every dip bin I inspected had `current_rate / 0.33 < 1`, consistent with over-assigned livetime from the too-low baseline.
+
+**Change:** In `raw_analysis.py` (both first-run and incremental-fallback paths), replace `np.median(k40_counts)` with `np.percentile(k40_counts, 75)` for the baseline, and log both values so the first rebuild confirms the bias number. The HDF5 key name (`k40_median_counts`) is kept for backward compatibility — it's still the livetime-correction baseline, just computed differently. No QA threshold changes: the plan is for the corrected livetimes to be close enough to truth that the existing `K40_MIN_RATE = 0.15` / `QA_THRESHOLD = 0.5` gates stop firing on the previously-residual dips.
+
+**New file:** `image_scripts/analysis/diagnose_k40_baseline.py` — standalone diagnostic that reads a recent window of raw CNFs (default last 500), computes K-40 gross counts per spectrum, and prints median / p75 / p90 / a text histogram / interpretation. No HDF5 writes. Purpose: empirically confirm the bimodality and the ~30% gap between median and p75 before paying for a full rebuild.
+
+**Deploy sequence:**
+1. On server: `python3 image_scripts/analysis/diagnose_k40_baseline.py` — verify p75/median ratio ≈ 1.3–1.4.
+2. Optionally `python3 image_scripts/weather_gatherer.py --fill-gaps` if `weatherhawk.csv` has internal date gaps (default cron run only fills trailing gaps).
+3. Delete `data/rebin.h5` and `data/last_processed.txt` to force full rebuild with the new baseline.
+4. Let cron run, or invoke `raw_analysis.py` + `h5_analysis.py` manually.
+5. Inspect new `iso_One_Month.png` — residual K-40 dips should flatten to the ~0.33 steady-state line.
+
 ---
 
 ## Known Issues & Future Work
