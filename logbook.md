@@ -240,6 +240,16 @@ The RadWatch air monitor is a rooftop gamma-ray spectroscopy system at UC Berkel
 python3 image_scripts/weather_gatherer.py --fill-gaps --since 2024-01-01
 ```
 
+### 2026-04-20: Handle Non-Numeric Weather Values (`--` Placeholder)
+
+**Problem:** After the `--fill-gaps` backfill brought in days where Weather Underground's table had `'--'` placeholder entries for missing readings, every subsequent pipeline run failed at `weather_utils.parse_weather_data` with `ValueError: could not convert string to float: '--'`. Both `raw_analysis.py` and `h5_analysis.py` exited with code 1; plots stopped updating (deploy still ran, but on stale PNGs).
+
+**Change (`weather_utils.py`, `parse_weather_data`):** Wrap the float coercion in a try/except that catches `ValueError`/`TypeError` and falls back to the same 0.0 default the existing code used for empty cells. This is the minimal unblock — handles `'--'`, `'N/A'`, `'nan'`, and anything else non-numeric that WU might return, while preserving the prior empty-cell semantics. Also collapsed the previous pattern of calling `float(row[order[k]])` multiple times on the same value into a single `tmp` local.
+
+**Known separate concerns (not fixed here):**
+- Treating missing values as 0.0 is historically what this parser does, but it's not physically correct (0.0 solar is very different from "no reading"). Converting missing to NaN would be more right, but the downstream plotting code isn't known to handle NaN in every weather field yet, so leaving that as-is for now.
+- `last_processed.txt` in the pushed `data/` snapshot points at a file inside `temp_test_folder/`. That path is excluded by the date-dir regex in `build_collection_incremental`, so the marker is effectively dead — every run "starts from the beginning" of the filtered file list, which isn't the incremental-path behavior the marker is meant to provide. Worth a separate cleanup pass.
+
 ### 2026-04-20: Docs — Add Runbook, Retire Pipeline Changelog
 
 **Problem:** Operational details for running tools in isolation (full rebuild, weather gap fill, K-40 diagnostic, manual deploy, stale-plot diagnosis) lived only in logbook prose and oral tradition. There was no runbook-style reference. Separately, `docs/pipeline_changelog.md` and `logbook.md` had substantial overlap — all three changelog entries (2026-02-22, 2026-02-23, 2026-04-16) were also in the logbook, and the changelog stopped being updated after 2026-04-16 while the logbook kept going.

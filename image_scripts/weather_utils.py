@@ -179,31 +179,36 @@ def parse_weather_data(f_name):
         for row in cvsreader:
             index += 1
             for k in range(0, len(order)):
+                val = row[order[k]]
                 if is_time_str[k]:
-                    date_obj = parse_date_to_struct(row[order[k]])
+                    date_obj = parse_date_to_struct(val)
                     list_of_lists[k].append(date_obj)
-                elif k == 12:
-                    # first rain sample or rain data reset.
-                    if row[order[k]] == '':
+                    continue
+                # Coerce to float; treat empty strings or non-numeric
+                # placeholders (e.g. Weather Underground's '--' for missing
+                # readings) as 0.0, matching the historical empty-cell behavior.
+                try:
+                    tmp = float(val)
+                except (ValueError, TypeError):
+                    tmp = None
+                if k == 12:
+                    # rain column: accumulate deltas against a running anchor
+                    if tmp is None:
                         prev_rain_sample = 0
                         list_of_lists[k].append(0.0)
                     else:
-                        tmp = float(row[order[k]])
                         if index == 0:
                             prev_rain_sample = tmp
                             list_of_lists[k].append(0.)
                         else:
-                            if float(row[order[k]]) - prev_rain_sample > 0:
-                                list_of_lists[k].append(float(row[order[k]]) - prev_rain_sample)
-                                prev_rain_sample = float(row[order[k]])
+                            if tmp - prev_rain_sample > 0:
+                                list_of_lists[k].append(tmp - prev_rain_sample)
+                                prev_rain_sample = tmp
                             else:
                                 list_of_lists[k].append(0)
-                            if float(row[order[k]]) == 0:
+                            if tmp == 0:
                                 prev_rain_sample = 0
                 else:
-                    if row[order[k]] == '':
-                        list_of_lists[k].append(0.0)
-                    else:
-                        list_of_lists[k].append(float(row[order[k]]))
+                    list_of_lists[k].append(tmp if tmp is not None else 0.0)
     
     return list_of_lists, units, label, is_time_str, order
