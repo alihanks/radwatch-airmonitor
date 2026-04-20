@@ -153,13 +153,14 @@ def gather_data():
     print(f"Weather gathering complete: {total_rows} total rows appended")
 
 
-def fill_gaps():
+def fill_gaps(since_date=None):
     """Find and fill internal gaps in weatherhawk.csv.
 
-    Scans all dates from the first to the last entry and scrapes any
-    dates that are missing from the CSV. Appended data will be out of
-    chronological order — run resort_weather_timestamps() afterward
-    (raw_analysis.py does this automatically).
+    Scans all dates from the first to the last entry (or from since_date
+    to the last entry if provided) and scrapes any dates that are missing
+    from the CSV. Appended data will be out of chronological order — run
+    resort_weather_timestamps() afterward (raw_analysis.py does this
+    automatically).
     """
     first_date = get_first_csv_date()
     last_date = get_last_csv_date()
@@ -168,13 +169,20 @@ def fill_gaps():
         print("Cannot fill gaps: CSV is empty or unreadable")
         return
 
+    if since_date is not None and since_date > first_date:
+        print(f"--since {since_date}: ignoring gaps before this date (CSV first entry is {first_date})")
+        scan_start = since_date
+    else:
+        scan_start = first_date
+
     existing_dates = get_csv_dates()
     print(f"CSV date range: {first_date} to {last_date}")
-    print(f"Dates with data: {len(existing_dates)}")
+    print(f"Scan range:     {scan_start} to {last_date}")
+    print(f"Dates with data in scan range: {sum(1 for d in existing_dates if scan_start <= d <= last_date)}")
 
-    # Find all missing dates in the range
+    # Find all missing dates in the scan range
     missing = []
-    date = first_date
+    date = scan_start
     while date <= last_date:
         if date not in existing_dates:
             missing.append(date)
@@ -229,9 +237,14 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Weather data gatherer for RadWatch')
     parser.add_argument('--fill-gaps', action='store_true',
                         help='Scan CSV for internal date gaps and backfill them from WeatherUnderground')
+    parser.add_argument('--since', type=lambda s: datetime.date.fromisoformat(s), default=None,
+                        metavar='YYYY-MM-DD',
+                        help='With --fill-gaps, ignore gaps before this date (e.g. to skip stale pre-station-install entries)')
     args = parser.parse_args()
 
     if args.fill_gaps:
-        fill_gaps()
+        fill_gaps(since_date=args.since)
     else:
+        if args.since is not None:
+            print("Note: --since is only used with --fill-gaps; ignoring")
         gather_data()

@@ -229,6 +229,17 @@ The RadWatch air monitor is a rooftop gamma-ray spectroscopy system at UC Berkel
 4. Let cron run, or invoke `raw_analysis.py` + `h5_analysis.py` manually.
 5. Inspect new `iso_One_Month.png` — residual K-40 dips should flatten to the ~0.33 steady-state line.
 
+### 2026-04-20: `weather_gatherer --since` for Gap Filling
+
+**Problem:** `weather_gatherer.py --fill-gaps` used the CSV's first timestamp as the start of the gap-scan range. `weatherhawk.csv` contains at least one stale entry from 2014 (pre-dating the actual weather station install), so `--fill-gaps` was attempting to scrape every missing day back to 2014 from Weather Underground — most of which returns nothing useful since the station didn't exist yet, and with a 2-second per-request delay that means thousands of wasted requests.
+
+**Change (`weather_gatherer.py`):** Add `--since YYYY-MM-DD` to cap how far back the gap scan goes. Passed as `since_date` into `fill_gaps()`; when provided and later than the CSV's first date, scan starts from `since_date` instead. Prints both the full CSV date range and the actual scan range so the effect is visible in logs. If the user passes `--since` without `--fill-gaps`, a note is printed and the flag is ignored.
+
+**Usage:**
+```
+python3 image_scripts/weather_gatherer.py --fill-gaps --since 2024-01-01
+```
+
 ### 2026-04-20: Fix Isotope Labels on "Most Recent Spectrum" Plot
 
 **Problem:** The `most_recent_spectra.png` plot showed isotope-name labels pointing to the wrong energies — several labels ("Pb212", "Pb214", "Be7", "Tl208", "Cs134", "Bi214", "Cs137") clustered in the 200–700 keV range regardless of where the actual peaks sit. Symptom of calibration drift: labels were anchored to hardcoded channel numbers, not energies.
