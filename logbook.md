@@ -240,6 +240,22 @@ The RadWatch air monitor is a rooftop gamma-ray spectroscopy system at UC Berkel
 python3 image_scripts/weather_gatherer.py --fill-gaps --since 2024-01-01
 ```
 
+### 2026-04-20: Docs — Add Runbook, Retire Pipeline Changelog
+
+**Problem:** Operational details for running tools in isolation (full rebuild, weather gap fill, K-40 diagnostic, manual deploy, stale-plot diagnosis) lived only in logbook prose and oral tradition. There was no runbook-style reference. Separately, `docs/pipeline_changelog.md` and `logbook.md` had substantial overlap — all three changelog entries (2026-02-22, 2026-02-23, 2026-04-16) were also in the logbook, and the changelog stopped being updated after 2026-04-16 while the logbook kept going.
+
+**Changes:**
+- **New: `docs/runbook.md`** — six-section operations reference:
+  1. Full rebuild of `rebin.h5` (when, steps, log signals, expected runtime)
+  2. Weather backfill (trailing catch-up vs `--fill-gaps --since`, re-sort helper)
+  3. K-40 baseline diagnostic (when to run, how to interpret median/p75/p90 ratios)
+  4. Diagnosing stale plots (top-down walk through cron → Dropbox → `last_processed.txt` → `rebin.h5` → PNGs → deploy)
+  5. Manual deploy / SFTP failure (`RADWATCH_SFTP_PASS` env var, `deploy.sh` invocation, target host)
+  6. QA flagged samples (`data/qa_flagged.csv` columns, reason strings, interpretation)
+- **Runbook includes a historical-data note** under the Full Rebuild section: the current pipeline only processes CNFs under the Dropbox `current/` folder (2025–2026 data). Pre-2018 data was processed with an older version pointing at the `RPAVLOVSKY` folder using different analysis procedures — that data should not be re-run through the current pipeline. The current code is still capable of parsing older CNFs if someone ever wanted to recover those results, but the pre-2018 published numbers aren't reproduced by the `current/`-only rebuild.
+- **Deleted: `docs/pipeline_changelog.md`** — redundant with `logbook.md`, stale after 2026-04-16. Going forward the logbook is the single source of truth; deep treatment (Problem / Root Cause / Change / Verify) happens inside logbook entries when warranted (e.g. today's K-40 baseline fix entry).
+- **`README.md`:** updated the project-structure block and the Documentation section to point at `runbook.md`, drop the `pipeline_changelog.md` reference, and fix the case on `logbook.md` (was `LOGBOOK.md`, a Linux-case-sensitive broken link).
+
 ### 2026-04-20: Fix Isotope Labels on "Most Recent Spectrum" Plot
 
 **Problem:** The `most_recent_spectra.png` plot showed isotope-name labels pointing to the wrong energies — several labels ("Pb212", "Pb214", "Be7", "Tl208", "Cs134", "Bi214", "Cs137") clustered in the 200–700 keV range regardless of where the actual peaks sit. Symptom of calibration drift: labels were anchored to hardcoded channel numbers, not energies.

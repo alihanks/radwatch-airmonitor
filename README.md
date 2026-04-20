@@ -60,11 +60,11 @@ radwatch-airmonitor/
   data/                     # Pipeline output (rebin.h5, PNGs, logs)
   docs/
     architecture.md         # Full system architecture and data flow
-    pipeline_changelog.md   # Detailed changelog for pipeline changes
+    runbook.md              # Operations reference (rebuilds, gap fills, diagnostics)
   environment.yml           # Conda environment specification
   requirements.txt          # Pip fallback dependencies
   setup.sh                  # Server setup script
-  LOGBOOK.md                # Development logbook
+  logbook.md                # Development logbook
 ```
 
 ## Environment
@@ -86,8 +86,8 @@ The pipeline runs in an isolated conda environment called `radwatch`. Required p
 ## Documentation
 
 - **[System Architecture](docs/architecture.md)** -- data flow diagrams, HDF5 schema, file reference
-- **[Pipeline Changelog](docs/pipeline_changelog.md)** -- detailed change history
-- **[Development Logbook](LOGBOOK.md)** -- session-by-session work log
+- **[Operations Runbook](docs/runbook.md)** -- rebuilds, weather backfill, K-40 diagnostic, deploy, QA review
+- **[Development Logbook](logbook.md)** -- session-by-session work log
 
 ## Cron Schedule
 
