@@ -39,7 +39,10 @@ QA_THRESHOLD = 0.5    # Flag if K-40 rate < 50% of rolling median
 K40_MIN_RATE = 0.15   # Absolute minimum K-40 rate (counts/sec); steady-state is ~0.33, anything below 0.15 is anomalous
 
 # K-40 livetime estimation constants
-K40_LIVETIME_THRESHOLD = 0.90  # Only correct livetimes when K-40 counts < 90% of median
+K40_LIVETIME_THRESHOLD = 0.90  # Trigger livetime correction when K-40 ratio < 0.90
+K40_LIVETIME_MIN_RATIO = 0.70  # Below this ratio the linear correction isn't reliable
+                               # (the spectrum is likely bad in ways other than short livetime),
+                               # so drop the raw spectrum instead of correcting it.
 PRESET_LIVETIME = 300.0        # Nominal collection interval in seconds
 
 
@@ -73,12 +76,18 @@ def compute_k40_gross_counts(collection, k40_roi):
 
 
 def estimate_livetimes_from_k40(collection, k40_roi, median_k40, preset_time=PRESET_LIVETIME):
-    """Correct livetimes for spectra with fewer K-40 counts than expected.
+    """Correct livetimes for spectra with fewer K-40 counts than expected,
+    and identify raw spectra that should be dropped entirely.
 
-    For each sample, compares K-40 gross counts to the stored median baseline.
-    If the ratio is below K40_LIVETIME_THRESHOLD, the livetime is scaled down
-    proportionally. Corrections are only applied downward (never increases
-    livetime above the preset).
+    For each sample, compares K-40 gross counts to the stored baseline:
+    - ratio >= K40_LIVETIME_THRESHOLD: no correction needed.
+    - K40_LIVETIME_MIN_RATIO <= ratio < K40_LIVETIME_THRESHOLD: scale livetime
+      down proportionally (only ever reduces, never increases). The linear
+      model is reliable in this range.
+    - ratio < K40_LIVETIME_MIN_RATIO: the spectrum is too suppressed for the
+      linear livetime-correction model to be trusted — it's likely bad in
+      ways beyond just short livetime. The sample's index is returned so the
+      caller can drop it before rebinning.
 
     Parameters
     ----------
@@ -87,33 +96,51 @@ def estimate_livetimes_from_k40(collection, k40_roi, median_k40, preset_time=PRE
     k40_roi : ROI
         The K-40 ROI object.
     median_k40 : float
-        Median K-40 gross counts baseline.
+        K-40 gross counts baseline (p75 of raw-spectrum counts).
     preset_time : float
         Nominal collection interval in seconds.
+
+    Returns
+    -------
+    drop_indices : set[int]
+        Indices into `collection` of samples that should be removed before
+        rebinning (ratio < K40_LIVETIME_MIN_RATIO).
     """
+    drop_indices = set()
     if median_k40 is None or median_k40 <= 0:
-        print("estimate_livetimes_from_k40: invalid median, skipping correction")
-        return
+        print("estimate_livetimes_from_k40: invalid baseline, skipping correction")
+        return drop_indices
 
     corrections = 0
-    for sample in collection:
+    for i, sample in enumerate(collection):
         spec = np.asarray(sample.counts)
         counts, _ = k40_roi.get_counts(spec)
         ratio = counts / median_k40
 
-        if ratio < K40_LIVETIME_THRESHOLD:
-            original_lt = sample.live_time.total_seconds() if hasattr(sample.live_time, 'total_seconds') else float(sample.live_time)
-            corrected_lt = preset_time * ratio
-            # Only correct downward
-            corrected_lt = min(corrected_lt, original_lt)
-            if corrected_lt > 0:
-                sample.live_time = datetime.timedelta(seconds=corrected_lt)
-                corrections += 1
-                print(f"  K40 livetime correction: {sample.timestamp} | "
-                      f"original={original_lt:.1f}s → corrected={corrected_lt:.1f}s | "
-                      f"K40 ratio={ratio:.3f}")
+        if ratio >= K40_LIVETIME_THRESHOLD:
+            continue
 
-    print(f"estimate_livetimes_from_k40: corrected {corrections}/{len(collection)} spectra")
+        if ratio < K40_LIVETIME_MIN_RATIO:
+            drop_indices.add(i)
+            print(f"  K40 spectrum drop: {sample.timestamp} | K40 ratio={ratio:.3f} "
+                  f"< min {K40_LIVETIME_MIN_RATIO} (not a reliable livetime correction)")
+            continue
+
+        # K40_LIVETIME_MIN_RATIO <= ratio < K40_LIVETIME_THRESHOLD: apply correction
+        original_lt = sample.live_time.total_seconds() if hasattr(sample.live_time, 'total_seconds') else float(sample.live_time)
+        corrected_lt = preset_time * ratio
+        # Only correct downward
+        corrected_lt = min(corrected_lt, original_lt)
+        if corrected_lt > 0:
+            sample.live_time = datetime.timedelta(seconds=corrected_lt)
+            corrections += 1
+            print(f"  K40 livetime correction: {sample.timestamp} | "
+                  f"original={original_lt:.1f}s → corrected={corrected_lt:.1f}s | "
+                  f"K40 ratio={ratio:.3f}")
+
+    print(f"estimate_livetimes_from_k40: corrected {corrections}, "
+          f"dropped {len(drop_indices)}, of {len(collection)} spectra")
+    return drop_indices
 
 
 def compute_roi_counts_for_collection(collection, rois):
@@ -250,7 +277,7 @@ if existing_data_loaded:
         rois_lt = load_rois_for_qa()
         k40_roi = rois_lt[K40_ROI_INDEX]
         if col.k40_median_counts is not None:
-            estimate_livetimes_from_k40(col_new.collection, k40_roi, col.k40_median_counts)
+            drop_indices = estimate_livetimes_from_k40(col_new.collection, k40_roi, col.k40_median_counts)
             k40_baseline = col.k40_median_counts
         else:
             print("WARNING: No stored K-40 baseline found in HDF5, computing from new data")
@@ -258,7 +285,12 @@ if existing_data_loaded:
             k40_median = float(np.median(k40_counts))
             k40_baseline = float(np.percentile(k40_counts, 75))
             print(f"K-40 gross counts baseline: median={k40_median:.2f}, p75={k40_baseline:.2f} (using p75)")
-            estimate_livetimes_from_k40(col_new.collection, k40_roi, k40_baseline)
+            drop_indices = estimate_livetimes_from_k40(col_new.collection, k40_roi, k40_baseline)
+
+        if drop_indices:
+            col_new.collection = [s for i, s in enumerate(col_new.collection) if i not in drop_indices]
+            print(f"Dropped {len(drop_indices)} raw spectra below K40 ratio {K40_LIVETIME_MIN_RATIO}; "
+                  f"{len(col_new.collection)} raw spectra remain for rebinning")
 
         # Rebin new data
         print("\nRebinning new data...")
@@ -328,7 +360,12 @@ else:
         k40_median = float(np.median(k40_counts))
         k40_baseline = float(np.percentile(k40_counts, 75))
         print(f"K-40 gross counts baseline: median={k40_median:.2f}, p75={k40_baseline:.2f} (using p75)")
-        estimate_livetimes_from_k40(col.collection, k40_roi, k40_baseline)
+        drop_indices = estimate_livetimes_from_k40(col.collection, k40_roi, k40_baseline)
+
+        if drop_indices:
+            col.collection = [s for i, s in enumerate(col.collection) if i not in drop_indices]
+            print(f"Dropped {len(drop_indices)} raw spectra below K40 ratio {K40_LIVETIME_MIN_RATIO}; "
+                  f"{len(col.collection)} raw spectra remain for rebinning")
 
         # Rebin
         print("\nRebinning data...")

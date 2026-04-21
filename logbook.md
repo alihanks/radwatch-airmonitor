@@ -240,6 +240,23 @@ The RadWatch air monitor is a rooftop gamma-ray spectroscopy system at UC Berkel
 python3 image_scripts/weather_gatherer.py --fill-gaps --since 2024-01-01
 ```
 
+### 2026-04-21: Drop Raw Spectra Below K-40 Ratio 0.70
+
+**Problem:** The p75 baseline fix collapsed the wide K-40 dips in the month plot (steady state restored to ~0.33), but narrow residual dips to ~0.15–0.25 remained at the start/end of continuous data runs. These are likely raw spectra that are bad in ways beyond just short livetime (gain shift, partial readout, electronics issue during stop/start) — the linear `livetime = preset × ratio` model assumes K-40 deficit is purely a livetime problem, and that assumption stops being trustworthy much below a ratio of ~0.70.
+
+**Change (`raw_analysis.py`):** Introduce `K40_LIVETIME_MIN_RATIO = 0.70`. `estimate_livetimes_from_k40` now returns a set of indices to drop:
+- `ratio >= 0.90`: no correction (unchanged).
+- `0.70 <= ratio < 0.90`: scale livetime down proportionally (unchanged behavior, new lower bound).
+- `ratio < 0.70`: **drop the raw spectrum** before rebinning. Logged per-sample with `K40 spectrum drop: timestamp | K40 ratio=X.XXX`.
+
+Both call sites (first-run and incremental) filter `col(_new).collection` by the returned drop set before calling `rebin()`. The summary log line now reports `corrected N, dropped M, of K spectra` for visibility.
+
+**Why drop at the raw-spectrum level (not the hourly QA level):** Dropping a raw spectrum only removes its ~300s of contribution from one hourly bin. The surviving raw spectra in that same hour still contribute their good data for all 7 isotopes. Compare to tightening hourly QA (`K40_MIN_RATE` or `QA_THRESHOLD`), which would drop the entire hour including the perfectly-good radon/thoron/cesium data from the other ~11 spectra in that bin. The surgical approach keeps more good data.
+
+**Expected effect on plots:** Residual edge dips to ~0.15–0.25 on K-40 should either flatten (if the constituent raw spectra are in the 0.70–0.90 range and get a stronger correction thanks to the higher p75 baseline) or leave NaN gaps (if too many in that bin are below 0.70 and get dropped). Both are honest outcomes.
+
+**Deploy:** Pull, let cron run. No HDF5 rebuild needed — the change applies going forward on every incremental run. If you want the existing historical data reprocessed under the new rules, delete `data/rebin.h5` and `data/last_processed.txt` to trigger a full rebuild.
+
 ### 2026-04-20: Handle Non-Numeric Weather Values (`--` Placeholder)
 
 **Problem:** After the `--fill-gaps` backfill brought in days where Weather Underground's table had `'--'` placeholder entries for missing readings, every subsequent pipeline run failed at `weather_utils.parse_weather_data` with `ValueError: could not convert string to float: '--'`. Both `raw_analysis.py` and `h5_analysis.py` exited with code 1; plots stopped updating (deploy still ran, but on stale PNGs).
