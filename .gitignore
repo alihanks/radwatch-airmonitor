@@ -3,3 +3,13 @@ __pycache__/
 image_scripts/analysis/*.csv
 SESSION_CONTEXT.md
 .claude/settings.local.json
+
+# Pipeline-generated outputs — regenerable from raw CNFs + code.
+# Tracked-history snapshots still live in git; these rules stop future
+# writes from landing in new commits.
+data/
+image_scripts/analysis/rooftop_tmp/
+weatherhawk.csv
+weather_sorted.csv
+weather_sorted.csv.backup
+weatherhawk.csv.backup

@@ -240,6 +240,18 @@ The RadWatch air monitor is a rooftop gamma-ray spectroscopy system at UC Berkel
 python3 image_scripts/weather_gatherer.py --fill-gaps --since 2024-01-01
 ```
 
+### 2026-04-21: Operational Cleanup — SFTP Log Noise, Stale Marker Self-Heal, Ignore Generated Outputs
+
+Three small operational fixes, each committed separately.
+
+**`deploy.sh` — suppress SFTP chmod noise.** WPEngine's SFTP server doesn't grant chmod to the uploading user; lftp's default behavior is to attempt chmod after every transferred file, generating ~17 "Access failed: permission denied" lines per run in `pipeline.log`. Transfers themselves succeed. Added `--no-perms` to the `mirror` invocation so lftp doesn't attempt remote chmods at all.
+
+**`sample_collection.build_collection_incremental` — self-heal stale marker.** When `data/last_processed.txt` pointed at a file no longer in the filtered CNF list (the current case: a file under `temp_test_folder/` that the date-dir regex now excludes), the pipeline was falling through to `start_index = 0` and reprocessing every CNF from the list origin on every hourly cron run. Works correctly thanks to HDF5 dedup on merge, but wastes I/O. Now, on stale-marker detection, the code deletes the marker file and falls into the same "no marker → last 10000 files" path used on initial runs. The next successful pipeline run writes a fresh valid marker and subsequent runs resume incremental behavior.
+
+**`.gitignore` — stop tracking generated pipeline outputs.** Every rebuild was adding ~600k lines to the repo (`data/rebin.h5` 15MB binary, `weather_sorted.csv` 364k rows, `weatherhawk.csv` 107k rows, all the regenerated PNGs). Ignored going forward: `data/`, `image_scripts/analysis/rooftop_tmp/`, `weatherhawk.csv`, `weather_sorted.csv`, and the two `.backup` CSVs. Used `git rm --cached` to untrack the current snapshots without deleting them from disk — the files stay on the server, and the last committed snapshot still lives in history if anyone needs it. Both directories (`data/`, `rooftop_tmp/`) are created at pipeline start via `os.makedirs(exist_ok=True)` and `mkdir -p`, so no placeholder `.gitkeep` needed.
+
+**Server pull note:** `git rm --cached` only removes from the index, not the working tree. When you pull on the server, git sees the files as newly-untracked (matched by .gitignore) and leaves them in place. Your `weatherhawk.csv` (with the 107k rows of scraped history) stays safely on disk. If you want to be paranoid, back it up before pulling (`cp weatherhawk.csv weatherhawk.csv.safety`) — it's not a file we'd want to lose.
+
 ### 2026-04-21: Drop Raw Spectra Below K-40 Ratio 0.70
 
 **Problem:** The p75 baseline fix collapsed the wide K-40 dips in the month plot (steady state restored to ~0.33), but narrow residual dips to ~0.15–0.25 remained at the start/end of continuous data runs. These are likely raw spectra that are bad in ways beyond just short livetime (gain shift, partial readout, electronics issue during stop/start) — the linear `livetime = preset × ratio` model assumes K-40 deficit is purely a livetime problem, and that assumption stops being trustworthy much below a ratio of ~0.70.
