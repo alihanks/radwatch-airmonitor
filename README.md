@@ -61,6 +61,7 @@ radwatch-airmonitor/
   docs/
     architecture.md         # Full system architecture and data flow
     runbook.md              # Operations reference (rebuilds, gap fills, diagnostics)
+    todo.md                 # Known open items / deferred work
   environment.yml           # Conda environment specification
   requirements.txt          # Pip fallback dependencies
   setup.sh                  # Server setup script
@@ -87,6 +88,7 @@ The pipeline runs in an isolated conda environment called `radwatch`. Required p
 
 - **[System Architecture](docs/architecture.md)** -- data flow diagrams, HDF5 schema, file reference
 - **[Operations Runbook](docs/runbook.md)** -- rebuilds, weather backfill, K-40 diagnostic, deploy, QA review
+- **[Open Items](docs/todo.md)** -- known flagged issues that have been deferred
 - **[Development Logbook](logbook.md)** -- session-by-session work log
 
 ## Cron Schedule

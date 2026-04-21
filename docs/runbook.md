@@ -36,8 +36,12 @@ tail -f data/pipeline.log
 
 **What to look for in the log:**
 - `K-40 gross counts baseline: median=X, p75=Y (using p75)` — appears once during the raw-analysis pass; confirms the livetime-correction baseline. Expect Y near ~100 on clean data; Y/X ratio of ~1.0–1.4 is the bimodality bias.
+- `K40 livetime correction: <timestamp> | original=...s → corrected=...s | K40 ratio=0.XXX` — one line per raw spectrum with K-40 ratio in `[0.70, 0.90)`; livetime scaled down proportionally.
+- `K40 spectrum drop: <timestamp> | K40 ratio=0.XXX < min 0.7 (not a reliable livetime correction)` — one line per raw spectrum with ratio below 0.70; spectrum is dropped before rebinning.
+- `estimate_livetimes_from_k40: corrected N, dropped M, of K spectra` — per-run summary across the raw-spectrum K-40 pass.
+- `Dropped N raw spectra below K40 ratio 0.7; M raw spectra remain for rebinning` — reports the filtered collection size just before rebin.
 - `Rebinning data...` — once per hour-bin pass, fast.
-- `QA flagged N anomalous samples` — flagged-sample count. Details land in `data/qa_flagged.csv`.
+- `QA flagged N anomalous samples` — hourly-level QA flagged-sample count; distinct from raw-spectrum drops above. Details in `data/qa_flagged.csv`.
 - `Database written` — final HDF5 write. If you don't see this, the rebuild didn't complete.
 
 **Expected runtime:** Proportional to the size of `current/`. Reading CNFs is the bottleneck; a full rebuild over a year's worth of hourly spectra takes several minutes of I/O.
@@ -115,6 +119,8 @@ python3 image_scripts/analysis/diagnose_k40_baseline.py --n 2000   # larger samp
 - `p75 ≫ 1.5 × median` → unusually heavy truncated tail. Investigate whether the detector is stopping collections early more than usual (MCA issue, power instability).
 - Very low `max` value (well below ~100) → either calibration has drifted or the detector is producing much fewer counts than nominal. Investigate.
 
+**Related pipeline behavior (set in `raw_analysis.py`):** raw spectra are compared to the stored p75 baseline. Ratio ≥ `K40_LIVETIME_THRESHOLD` (0.90) → no correction. Ratio in `[K40_LIVETIME_MIN_RATIO, K40_LIVETIME_THRESHOLD)` (`[0.70, 0.90)`) → livetime scaled down proportionally. Ratio < `K40_LIVETIME_MIN_RATIO` (0.70) → raw spectrum is **dropped** before rebinning, because the linear correction isn't reliable at that depth of K-40 deficit (spectrum likely has problems beyond short livetime). The drop mechanism logs per-sample and is separate from the hourly QA filter below (see §6).
+
 ---
 
 ## 4. Diagnosing stale plots on the web
@@ -185,7 +191,22 @@ The script uses `lftp` with an `EOF` heredoc mirror. If it hangs or fails mid-up
 
 ---
 
-## 6. QA flagged samples
+## 6. Sample-level filtering (raw drops + hourly QA)
+
+Two filters operate at different levels; both are worth knowing about when diagnosing missing data.
+
+### 6a. Raw-spectrum drops (pre-rebin)
+
+Applied in `raw_analysis.py` during the K-40 livetime-correction pass (see §3). When a raw spectrum's K-40 counts are below `K40_LIVETIME_MIN_RATIO × baseline` (currently `0.70 × p75`), the spectrum is removed from the collection before rebinning. These are **not** recorded in `qa_flagged.csv` — they only appear in `pipeline.log` as `K40 spectrum drop: <timestamp> | K40 ratio=0.XXX`.
+
+Count them via:
+```bash
+grep -c "K40 spectrum drop:" data/pipeline.log
+```
+
+Dropping at the raw level is surgical: only that one ~300s spectrum is removed, and the other spectra contributing to the same hourly bin still contribute to all 7 isotope rates.
+
+### 6b. Hourly QA flagged samples (post-rebin)
 
 **File:** `data/qa_flagged.csv`.
 
@@ -194,6 +215,8 @@ The script uses `lftp` with an `EOF` heredoc mirror. If it hangs or fails mid-up
 **Reason strings (from `raw_analysis.py`):**
 - `K40 rate X.XXXX < absolute minimum 0.15` — hourly K-40 rate fell below the hard floor. Hard floor exists to catch obviously bad data even when the rolling median hasn't stabilized (e.g. start of a fresh rebuild). Controlled by `K40_MIN_RATE` in `raw_analysis.py`.
 - `K40 rate X.XXXX < 50% of median Y.YYYY` — K-40 dropped to under half of the 24-hour rolling median. Catches sudden mid-series drops that aren't low in absolute terms. Controlled by `QA_THRESHOLD` (0.5) and `QA_WINDOW` (24) in `raw_analysis.py`.
+
+When the raw-spectrum drop (6a) is catching the problem cleanly, hourly QA should rarely trigger. If hourly QA is firing often, the raw-spectrum drop threshold may need revisiting (see `docs/todo.md`).
 
 **Looking for patterns:**
 

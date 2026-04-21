@@ -240,6 +240,15 @@ The RadWatch air monitor is a rooftop gamma-ray spectroscopy system at UC Berkel
 python3 image_scripts/weather_gatherer.py --fill-gaps --since 2024-01-01
 ```
 
+### 2026-04-21: Runbook Touch-Up, Add `docs/todo.md`
+
+**Runbook updates (`docs/runbook.md`):**
+- §1 (Full rebuild, "What to look for in the log") now documents the new K-40 per-sample log lines (`K40 livetime correction:`, `K40 spectrum drop:`) and the summary `estimate_livetimes_from_k40: corrected N, dropped M, of K spectra`.
+- §3 (K-40 baseline diagnostic) now includes the `K40_LIVETIME_THRESHOLD = 0.90` / `K40_LIVETIME_MIN_RATIO = 0.70` band explanation so readers understand the connection between the diagnostic numbers and the pipeline's decision logic.
+- §6 split into §6a (raw-spectrum drops, pre-rebin) and §6b (hourly QA, post-rebin). §6a explains these drops only appear in `pipeline.log` and are not in `qa_flagged.csv`. §6b notes that heavy hourly QA activity is a signal to revisit the raw-drop threshold.
+
+**New: `docs/todo.md`** — open-items list for things flagged during recent sessions and deferred: weather parser NaN-vs-0.0 semantics, missing 2017–2024 weather history, unverified backwards-compatibility with pre-2018 CNFs, and a reminder to re-evaluate the K-40 correction thresholds after some accumulated data. Each entry says what/why/how-a-fix-would-look. Linked from `README.md`'s Documentation section and listed in the project-structure block.
+
 ### 2026-04-21: Operational Cleanup — SFTP Log Noise, Stale Marker Self-Heal, Ignore Generated Outputs
 
 Three small operational fixes, each committed separately.
