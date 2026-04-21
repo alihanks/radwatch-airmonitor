@@ -31,7 +31,7 @@ ls -1 "${LOCAL_DIR}"/*.png "${LOCAL_DIR}"/*.csv 2>/dev/null | wc -l
 lftp <<EOF
 set sftp:auto-confirm yes
 open -u ${SFTP_USER},${RADWATCH_SFTP_PASS} sftp://${SFTP_HOST}:${SFTP_PORT}
-mirror -Rnv ${LOCAL_DIR} ${REMOTE_DIR}
+mirror -Rnv --no-perms ${LOCAL_DIR} ${REMOTE_DIR}
 quit
 EOF
 
