@@ -674,12 +674,24 @@ class SampleCollection:
         if os.path.exists(last_processed_marker):
             with open(last_processed_marker, 'r') as f:
                 last_file = f.read().strip()
-                print(f"Last processed file: {last_file}")
-                if last_file in fil_list:
-                    start_index = fil_list.index(last_file) + 1
-                    print(f"Resuming from file index {start_index}")
-                else:
-                    print(f"Last processed file not found in current file list, starting from beginning")
+            print(f"Last processed file: {last_file}")
+            if last_file in fil_list:
+                start_index = fil_list.index(last_file) + 1
+                print(f"Resuming from file index {start_index}")
+            else:
+                # Marker points at a file that's no longer in the filtered list
+                # (e.g. its directory got excluded, or the file was removed).
+                # Delete the stale marker so it gets rewritten on the next
+                # successful run, and fall through to the "no marker" recent-
+                # files default rather than reprocessing everything from the
+                # start of the list.
+                print(f"Last processed file not in filtered list ({last_file}); "
+                      f"treating as stale marker and processing recent files only")
+                try:
+                    os.remove(last_processed_marker)
+                except OSError as e:
+                    print(f"  (could not delete stale marker: {e})")
+                start_index = max(0, len(fil_list) - 10000)
         else:
             print(f"No last processed marker found, processing recent files")
             # Default to last 10000 files if no marker exists
