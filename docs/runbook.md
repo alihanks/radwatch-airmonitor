@@ -234,3 +234,108 @@ tail -20 data/qa_flagged.csv
 - Flags that all say "absolute minimum" during the first day after a rebuild: expected (rolling median baseline hadn't stabilized yet); those samples are dropped but everything after steady-state is fine.
 
 The QA filter does not affect the source CNFs in Dropbox; it only decides which rebinned hourly samples to retain in `rebin.h5`.
+
+---
+
+## 7. Host system maintenance
+
+This section covers issues with the dosenet **server itself**, not the analysis pipeline. Start here when symptoms are unresponsiveness, freezes, system log oddities, microcode/security warnings, or anything affecting the OS rather than the pipeline scripts.
+
+### 7a. System freezes / soft lockups (the 2026-05 incident)
+
+**Symptom:** The server becomes unresponsive after some uptime. Console is up but ignores input; SSH may or may not respond. Force-rebooting "fixes" it for a while but it recurs.
+
+**Diagnosis:** Boot the machine, vacuum the journal if it's full (see §7b), then check the kernel log from the *previous* boot:
+
+```bash
+sudo journalctl -k -b -1 --no-pager | tail -200
+```
+
+Look for any of these signatures:
+- `watchdog: BUG: soft lockup - CPU#N stuck for <thousands of seconds>!`
+- Stack traces passing through `smp_call_function_many_cond` → `native_flush_tlb_multi`
+- `srso_return_thunk` appearing in every frame
+- Boot warning: `Speculative Return Stack Overflow: IBPB-extending microcode not applied!`
+
+If all four are present, the freeze is the known Linux/AMD SRSO software-mitigation soft-lockup bug. It hits AMD Zen 1/2/3 systems whose BIOS hasn't shipped the IBPB-extending microcode that lets the kernel use the hardware mitigation. The kernel's software fallback has soft-lockup issues on TLB-flush IPIs. Trigger is generally benign (e.g. `update-notifier` calling `clone()`), so any long-running session eventually hits it.
+
+**Fix path, in order:**
+
+1. **Update CPU microcode (low risk, do first):**
+   ```bash
+   sudo bash maintenance/update_microcode.sh
+   sudo reboot
+   bash maintenance/update_microcode.sh --check
+   ```
+   Confirm the post-reboot `--check` shows a higher microcode revision in `/proc/cpuinfo` and that the "IBPB-extending microcode not applied!" line is no longer in dmesg. If both true, the bug is likely resolved.
+
+2. **If microcode update isn't available or doesn't help — disable SRSO mitigation (kernel workaround):**
+
+   Edit `/etc/default/grub`:
+   ```
+   GRUB_CMDLINE_LINUX_DEFAULT="quiet splash spec_rstack_overflow=off"
+   ```
+   Then:
+   ```bash
+   sudo update-grub
+   sudo reboot
+   ```
+   Verify with:
+   ```bash
+   cat /sys/devices/system/cpu/vulnerabilities/spec_rstack_overflow
+   ```
+   should report `Mitigation: Safe RET` or `Vulnerable: Microcode is missing` depending on hardware. The tradeoff: SRSO is a local-attacker speculation side-channel — exploitable only by attackers who already have code execution on the box. For a single-purpose lab server this is a reasonable opt-out. This is the standard workaround recommended when proper microcode isn't available.
+
+3. **Update the BIOS (long-term proper fix):**
+   The dosenet motherboard (ASRock A320M) shipped with BIOS dated 2017-03-06. ASRock has newer BIOS revisions that include updated AMD AGESA → updated microcode delivered at boot. Do this only during a deliberate maintenance window with the workaround already in place — a failed BIOS update is hard to recover from.
+
+### 7b. `journalctl` hanging / journal storage full
+
+**Symptom:** `journalctl` invocations hang for minutes; `systemctl status systemd-journald` shows storage is at the cap (e.g. `System Journal ... is 4.0G, max 4.0G, 0B free.`) and flush times in the tens of seconds for 1000 entries.
+
+**Cause:** The persistent journal at `/var/log/journal/` has filled its quota and is grinding on every read/write.
+
+**Fix:**
+
+```bash
+# Trim the journal to a manageable size (keeps the most recent ~500MB).
+sudo journalctl --vacuum-size=500M
+
+# Optionally cap the journal permanently so this doesn't recur.
+sudo sed -i 's/^#SystemMaxUse=.*/SystemMaxUse=500M/' /etc/systemd/journald.conf
+# (Or edit by hand and set SystemMaxUse=500M)
+
+sudo systemctl restart systemd-journald
+```
+
+After vacuuming, `journalctl` returns instantly again. **Be aware:** vacuuming deletes the older entries, so do any pre-freeze diagnosis (e.g. `journalctl -b -1 -p err > prev_boot_errors.log`) **before** running vacuum.
+
+### 7c. Drive health snapshot
+
+Both drives should be checked periodically:
+
+```bash
+sudo smartctl -a /dev/sda    # Kingston SSD (currently holds /boot/efi)
+sudo smartctl -a /dev/sdb    # Toshiba HDD (currently holds /)
+```
+
+Look for:
+- `SMART overall-health self-assessment test result: PASSED` — top-line OK.
+- `Reallocated_Sector_Ct` — should be 0 or very low and stable. Rising = drive remapping bad sectors.
+- `Current_Pending_Sector` — should be 0. Non-zero = sectors the drive *wants* to remap on next write.
+- `Reported_Uncorrect` — should be 0. Non-zero = drive returned bad data to the kernel.
+- `UDMA_CRC_Error_Count` — should be 0 or very low. High = SATA cable issue.
+- `Unexpect_Power_Loss_Ct` (SSD only) — every hard reboot from a freeze increments this. High counts mean the drive has been forcibly cut a lot; investigate the freeze root cause.
+- `Temperature_Celsius` — under 50 °C is fine.
+
+### 7d. Where else to look when troubleshooting
+
+| Symptom | First place to check |
+|---------|----------------------|
+| Pipeline not updating | `data/pipeline.log` (see §4) |
+| System frozen / unresponsive | `journalctl -k -b -1` (see §7a) |
+| Disk-related kernel errors | `sudo smartctl -a /dev/sda` and `/dev/sdb` (see §7c) |
+| Memory pressure / OOM kills | `free -h`, `dmesg \| grep -i oom` |
+| High CPU temperatures | `sensors` (install `lm-sensors`) |
+| Network/SFTP failures | `journalctl -u networking`, see §5 for SFTP |
+| Dropbox not syncing | `ps aux \| grep dropbox`, `dropbox status` |

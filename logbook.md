@@ -261,6 +261,38 @@ Three small operational fixes, each committed separately.
 
 **Server pull note:** `git rm --cached` only removes from the index, not the working tree. When you pull on the server, git sees the files as newly-untracked (matched by .gitignore) and leaves them in place. Your `weatherhawk.csv` (with the 107k rows of scraped history) stays safely on disk. If you want to be paranoid, back it up before pulling (`cp weatherhawk.csv weatherhawk.csv.safety`) — it's not a file we'd want to lose.
 
+### 2026-05-15: Diagnose Recurring Server Freezes (SRSO Soft Lockup); Add `maintenance/`
+
+**Problem:** Server had been hanging recurrently — most recently visible as a force-reboot every 1–4 weeks. User asked for help diagnosing.
+
+**Diagnosis:** A staged log-gathering pass (`dmesg`, SMART for both drives, journald state, Dropbox process, memory, reboot history, plus a photo of the post-reboot fsck screen) showed:
+- Hardware healthy: both drives PASSED SMART (Kingston SSD on sda for `/boot/efi`, Toshiba 1TB HDD on sdb for `/`), zero pending sectors, temps fine, 31 GiB RAM mostly idle.
+- The `journalctl` hangs were a separate problem: `/var/log/journal/` was at its 4 GiB cap with 15+s flush times for 1000 entries. Vacuuming with `sudo journalctl --vacuum-size=500M` unstuck it.
+- After vacuuming, `journalctl -k -b -1` revealed the actual freeze cause: `watchdog: BUG: soft lockup - CPU#4 stuck for 39115s! [update-notifier:29036]`, with every stack trace passing through `smp_call_function_many_cond` → `native_flush_tlb_multi` and `srso_return_thunk` interleaved in every frame.
+- Boot warning from the same log: `Speculative Return Stack Overflow: IBPB-extending microcode not applied!`
+- Motherboard reports `ASRock A320M, BIOS P1.20 03/06/2017` — a nine-year-old BIOS that never shipped the microcode the kernel needs for the hardware SRSO mitigation.
+
+**Root cause:** Known AMD/Linux interaction. On Zen 1/2/3 CPUs without the IBPB-extending microcode, the kernel falls back to a software SRSO mitigation that has soft-lockup issues on TLB-flush IPIs (`smp_call_function_many`). Any process calling `clone()` eventually triggers it; the freeze trigger here (`update-notifier`) is incidental.
+
+**Changes:**
+
+- **New: `maintenance/` folder** — first server-level (host OS) maintenance script lives here, distinct from the pipeline-level `image_scripts/`. Includes a short `maintenance/README.md` describing the folder's intent and pointing at `docs/runbook.md` §7.
+- **New: `maintenance/update_microcode.sh`** — detects CPU vendor, installs/upgrades the matching microcode package (`amd64-microcode` or `intel-microcode`), runs `update-initramfs -u`, and reports before/after state (CPU model, microcode revision in `/proc/cpuinfo`, dmesg microcode lines, SRSO mitigation status from `/sys/devices/system/cpu/vulnerabilities/spec_rstack_overflow`, installed package versions). Includes a `--check` mode that reports state without modifying anything. Standalone bash; no project dependencies.
+- **`docs/runbook.md`** — added **§7 Host system maintenance** covering: (7a) the SRSO freeze diagnosis and three-step fix path (microcode update → `spec_rstack_overflow=off` kernel param workaround → BIOS update), (7b) full-journal `journalctl` hangs and the vacuum fix with `SystemMaxUse=500M` cap, (7c) drive health snapshot interpreting SMART attributes for both drives, (7d) lookup table of symptom → first place to check.
+- **`README.md`** — added `maintenance/` to the project-structure block; mentioned host-system troubleshooting in the Documentation section's runbook bullet.
+
+**Why this lives in the repo:** The fix isn't a code change to the analysis pipeline — it's host OS hygiene — but the host *is* the production environment for this pipeline, and the freezes were taking the pipeline down. Centralizing the diagnosis and fix in the repo means the next person to encounter symptoms doesn't have to re-derive everything from kernel logs.
+
+**Deploy:** Pull on the server, then:
+```
+sudo bash maintenance/update_microcode.sh
+sudo reboot
+bash maintenance/update_microcode.sh --check
+```
+If the SRSO warning persists after reboot, fall back to the kernel-parameter workaround in §7a step 2.
+
+---
+
 ### 2026-04-21: Drop Raw Spectra Below K-40 Ratio 0.70
 
 **Problem:** The p75 baseline fix collapsed the wide K-40 dips in the month plot (steady state restored to ~0.33), but narrow residual dips to ~0.15–0.25 remained at the start/end of continuous data runs. These are likely raw spectra that are bad in ways beyond just short livetime (gain shift, partial readout, electronics issue during stop/start) — the linear `livetime = preset × ratio` model assumes K-40 deficit is purely a livetime problem, and that assumption stops being trustworthy much below a ratio of ~0.70.
