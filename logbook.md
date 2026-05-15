@@ -261,6 +261,32 @@ Three small operational fixes, each committed separately.
 
 **Server pull note:** `git rm --cached` only removes from the index, not the working tree. When you pull on the server, git sees the files as newly-untracked (matched by .gitignore) and leaves them in place. Your `weatherhawk.csv` (with the 107k rows of scraped history) stays safely on disk. If you want to be paranoid, back it up before pulling (`cp weatherhawk.csv weatherhawk.csv.safety`) — it's not a file we'd want to lose.
 
+### 2026-05-15: Durable SFTP Credential Storage via `~/.radwatch_env`
+
+**Problem:** The 2026-04-17 commit `49d062e` moved the SFTP password out of `deploy.sh` into a `RADWATCH_SFTP_PASS` env var but never put it anywhere durable — the logbook explicitly noted this as an open issue at the time. The May 15 reboot wiped the value from the interactive shell where it had been set, and the next pipeline run hit `ERROR: RADWATCH_SFTP_PASS not set`. Symptom on the website: stale plots because deploy was failing every cron tick.
+
+The deeper issue was discoverability: nothing in the repo told a future operator *when* the password was needed or *where* to put it. The runbook documented it but only as a place to set the env var, with several options and no canonical one.
+
+**Change:**
+
+- **`setup.sh`** — added a new step (renumbered to step 8) that prompts for the SFTP password during initial setup. Input is hidden (`read -s`). On success, writes `~/.radwatch_env` with `umask 077` + explicit `chmod 600`, using `printf '%q'` for shell-safe quoting that survives any character in the password. If the file already exists, the step prints a "found existing credentials" message and skips the prompt — so setup is safe to re-run on already-configured systems. If the user hits Enter without typing, a warning is recorded and shown in the final summary section ("the deploy step will fail until you...").
+- **`deploy.sh`** — when `RADWATCH_SFTP_PASS` isn't already set in the environment, source `~/.radwatch_env` as a fallback before the "is it set?" check. The env-var-first ordering preserves any one-off override from the calling shell or a crontab line. The error message on still-unset now points at `bash setup.sh` and runbook §5 instead of giving a bare `export ...` hint with no context.
+- **`docs/runbook.md` §5** — rewritten with `~/.radwatch_env` as the canonical durable location. New subsections: "First-time setup" (run setup.sh), "Changing the password" (edit the file in place), "Checking the current state", "Manual deploy", "One-off override", "Crontab-line override". The previous bullet-style "places it could live" is gone — there's now one default with documented overrides.
+- **`README.md`** — Quick Start step 2 comment expanded to mention that setup.sh prompts for the SFTP password.
+- **`.gitignore`** — added `.radwatch_env` defensively. The file lives in `$HOME` not the repo, but this guards against an accidental copy landing in the working tree.
+
+**Why a file in `$HOME` rather than a crontab line, `~/.bashrc`, or `/etc/environment`:**
+
+- A file is editable in place (vs `crontab -e` which has stale-lock issues).
+- `$HOME/.radwatch_env` is scoped to the `dosenet` user, mode 600.
+- It works for both cron and interactive use without duplicating the value in two places.
+- It survives reboots (unlike a shell-session export).
+- It's outside the repo entirely, so no `.gitignore` discipline is required to keep it out of history.
+
+**Deploy:** Pull, then on the server run `bash setup.sh` once. The new step will detect there's no existing `~/.radwatch_env`, prompt for the password, write the file. From then on the cron deploy step picks it up automatically on every hourly run, and `bash image_scripts/analysis/deploy.sh` works interactively without any preceding `export`.
+
+---
+
 ### 2026-05-15: Fix Date-Dir Filter Letting Non-Date Folders Through
 
 **Problem:** User reported graphs on the web dashboard had been stuck for ~1 week despite recent CNFs being present in Dropbox. `last_processed.txt` on the server was pointing at a file inside `temp_test_folder/`, the same legacy non-date directory the 2026-04-21 self-heal commit (`84ba072`) was supposed to defend against. The self-heal wasn't firing because the marker file **was** in the filtered list — just at the wrong position.

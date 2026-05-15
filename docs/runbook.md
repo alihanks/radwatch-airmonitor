@@ -168,26 +168,74 @@ grep "Deploying\|Deploy exit code" data/pipeline.log | tail -10
 
 ## 5. Manual deploy / SFTP failure
 
-**Symptom:** Pipeline log shows `Deploy exit code: <nonzero>` or `ERROR: RADWATCH_SFTP_PASS not set`.
+**Symptom:** Pipeline log shows `Deploy exit code: <nonzero>` or `ERROR: RADWATCH_SFTP_PASS is not set and ~/.radwatch_env did not define it.`
 
-**Check the env var is set:**
+### Where the password lives
+
+The SFTP password is stored in `~/.radwatch_env` on the server. It's a normal one-line shell file:
 
 ```bash
-echo "SFTP pass set: $([ -n "$RADWATCH_SFTP_PASS" ] && echo yes || echo no)"
+export RADWATCH_SFTP_PASS='...'
 ```
 
-**Persistent places it should be set:**
-- In the crontab line before the cron_job.sh call: `RADWATCH_SFTP_PASS=... 0 * * * * ...`
-- Or in `~/.bashrc` (only picked up by interactive shells, not cron — cron needs the env var in the crontab itself).
+Mode `600` (only the running user can read it). It lives in `$HOME`, not in the repo, so it can never be committed. `deploy.sh` sources it automatically whenever `RADWATCH_SFTP_PASS` isn't already set in the calling shell or crontab — so it works for cron, interactive runs, and one-off testing without any manual `export` after a reboot.
 
-**Manual deploy** (after a successful pipeline run, or after rebuilding `rooftop_tmp/` contents):
+### First-time setup
+
+`bash setup.sh` from the repo root prompts for the password (input is hidden) and writes the file with the correct permissions. If the file already exists, setup skips the prompt and tells you to edit the file directly instead. So setup is safe to re-run.
+
+### Changing the password
+
+Edit `~/.radwatch_env` in place. There's nothing else to update — `deploy.sh` re-sources it on every run, and the cron job picks up the new value on the next hourly tick.
 
 ```bash
-export RADWATCH_SFTP_PASS='...'                 # only if not already set
+nano ~/.radwatch_env       # change the value inside the quotes
+chmod 600 ~/.radwatch_env  # belt-and-suspenders if the editor relaxed the mode
+```
+
+### Checking the current state
+
+```bash
+# Is the env var set in this shell?
+echo "SFTP pass set in shell: $([ -n "$RADWATCH_SFTP_PASS" ] && echo yes || echo no)"
+
+# Is the durable file in place?
+ls -la ~/.radwatch_env
+
+# Source it into the current shell (for ad-hoc commands that need the var).
+source ~/.radwatch_env
+```
+
+### Manual deploy
+
+After a successful pipeline run, or after rebuilding `rooftop_tmp/` contents:
+
+```bash
 bash image_scripts/analysis/deploy.sh
 ```
 
+No `export` needed — `deploy.sh` will pick up `~/.radwatch_env` on its own.
+
 The script uses `lftp` with an `EOF` heredoc mirror. If it hangs or fails mid-upload, the lftp output will show which file failed. Target is `sftp://coeradwatch.sftp.wpengine.com:2222/test/` under user `coeradwatch-RADWATCH`.
+
+### One-off override (testing a different account)
+
+If you need to deploy with a different password for a single run without touching the file:
+
+```bash
+RADWATCH_SFTP_PASS='temporary-password' bash image_scripts/analysis/deploy.sh
+```
+
+The env-var-first ordering in `deploy.sh` means the shell-set value wins over `~/.radwatch_env` for that invocation only.
+
+### Crontab-line override (rarely needed)
+
+The `~/.radwatch_env` approach already covers cron. But if you ever want to scope a different password specifically to cron (e.g. a separate account for automated deploys), you can put it on the crontab line, which `deploy.sh` will see before falling back to the file:
+
+```
+RADWATCH_SFTP_PASS=different-password
+0 * * * * /home/dosenet/radwatch-airmonitor/image_scripts/analysis/cron_job.sh
+```
 
 ---
 

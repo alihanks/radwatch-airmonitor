@@ -131,13 +131,54 @@ for cmd in convert lftp; do
     fi
 done
 
-# ---- 8. Make cron script executable ----
+# ---- 8. SFTP credentials ----
+echo ""
+echo "--- SFTP credentials ---"
+ENV_FILE="${HOME}/.radwatch_env"
+
+if [ -f "${ENV_FILE}" ] && grep -q '^export RADWATCH_SFTP_PASS=' "${ENV_FILE}"; then
+    echo "Found existing credentials at ${ENV_FILE}"
+    echo "  To change the password later, edit this file directly"
+    echo "  (it's a one-line shell file: export RADWATCH_SFTP_PASS='...')."
+    SFTP_PASS_CONFIGURED=1
+else
+    echo "The pipeline deploys plots to WPEngine via SFTP."
+    echo "The password is stored at:"
+    echo "    ${ENV_FILE}    (mode 600, never committed)"
+    echo "and sourced automatically by deploy.sh on every run."
+    echo ""
+    echo "Press Enter without typing to skip; re-run setup.sh to configure later."
+    echo ""
+    # -s hides the input; || true keeps `set -e` from killing us on EOF (Ctrl-D).
+    read -r -s -p "  RadWatch SFTP password: " RW_PASS || true
+    echo ""
+    if [ -n "${RW_PASS:-}" ]; then
+        # printf %q produces shell-safe quoting that survives any character
+        # in the password (single quotes, dollar signs, etc.) when the file
+        # is later sourced.
+        umask 077
+        printf 'export RADWATCH_SFTP_PASS=%q\n' "${RW_PASS}" > "${ENV_FILE}"
+        chmod 600 "${ENV_FILE}"
+        unset RW_PASS
+        echo "  Wrote ${ENV_FILE} (mode 600)."
+        SFTP_PASS_CONFIGURED=1
+    else
+        echo "  Skipped. The pipeline will run but the deploy step will fail until"
+        echo "  you either re-run setup.sh or create the file manually:"
+        echo "      umask 077"
+        echo "      printf \"export RADWATCH_SFTP_PASS=<password>\\n\" > ${ENV_FILE}"
+        echo "      chmod 600 ${ENV_FILE}"
+        SFTP_PASS_CONFIGURED=0
+    fi
+fi
+
+# ---- 9. Make cron script executable ----
 echo ""
 echo "--- Setting permissions ---"
 chmod +x "${ANALYSIS_DIR}/cron_job.sh"
 echo "Made cron_job.sh executable"
 
-# ---- 9. Test import of core modules ----
+# ---- 10. Test import of core modules ----
 echo ""
 echo "--- Testing Python imports (in '${CONDA_ENV}' env) ---"
 cd "${ANALYSIS_DIR}"
@@ -171,7 +212,7 @@ else:
     print('\nAll modules imported successfully.')
 "
 
-# ---- 10. Summary ----
+# ---- 11. Summary ----
 echo ""
 echo "========================================"
 echo "Setup complete!"
@@ -193,7 +234,14 @@ echo ""
 echo "  4. Check that plots were generated:"
 echo "     ls -la ${ANALYSIS_DIR}/rooftop_tmp/*.png"
 echo ""
+if [ "${SFTP_PASS_CONFIGURED:-0}" -eq 0 ]; then
+    echo "  WARNING: SFTP credentials were not configured."
+    echo "  The pipeline will run but the deploy step will fail until you set up"
+    echo "  ${HOME}/.radwatch_env (see docs/runbook.md §5)."
+    echo ""
+fi
 echo "  For crontab, ensure the conda env is activated:"
 echo "     The cron_job.sh script handles this automatically."
 echo ""
-echo "See docs/architecture.md for full system documentation."
+echo "See docs/architecture.md for full system documentation, and"
+echo "docs/runbook.md for day-to-day operations and troubleshooting."

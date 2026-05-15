@@ -20,7 +20,8 @@ A detailed [workflow diagram](https://github.com/alihanks/radwatch-airmonitor/wi
 git clone https://github.com/alihanks/radwatch-airmonitor.git
 cd radwatch-airmonitor
 
-# 2. Run the setup script (creates conda env, checks dependencies)
+# 2. Run the setup script (creates conda env, checks dependencies,
+#    prompts for the SFTP password and writes it to ~/.radwatch_env)
 bash setup.sh
 
 # 3. Activate the environment

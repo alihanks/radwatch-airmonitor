@@ -4,6 +4,9 @@ __pycache__/
 image_scripts/analysis/*.csv
 SESSION_CONTEXT.md
 .claude/settings.local.json
+# Defensive: the SFTP password file lives in $HOME, not the repo, but
+# guard against an accidental copy landing here.
+.radwatch_env
 
 # Pipeline-generated outputs — regenerable from raw CNFs + code.
 # Tracked-history snapshots still live in git; these rules stop future

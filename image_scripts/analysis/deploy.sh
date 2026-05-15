@@ -4,7 +4,15 @@
 # Usage:
 #   bash deploy.sh
 #
-# Requires RADWATCH_SFTP_PASS environment variable, or set it in crontab.
+# Password handling:
+#   RADWATCH_SFTP_PASS is read from the environment first. If unset,
+#   ~/.radwatch_env is sourced as a fallback (this is the durable
+#   location written by setup.sh). To change the password later, edit
+#   ~/.radwatch_env directly — it's a normal shell file with one line:
+#     export RADWATCH_SFTP_PASS='...'
+#   For a one-off override (e.g. testing a different account), export
+#   the variable in the calling shell before invoking this script.
+#   See docs/runbook.md §5 for the full setup and troubleshooting story.
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 LOCAL_DIR="${SCRIPT_DIR}/rooftop_tmp"
@@ -13,9 +21,17 @@ SFTP_USER="coeradwatch-RADWATCH"
 SFTP_HOST="coeradwatch.sftp.wpengine.com"
 SFTP_PORT=2222
 
-if [ -z "$RADWATCH_SFTP_PASS" ]; then
-    echo "ERROR: RADWATCH_SFTP_PASS not set"
-    echo "  export RADWATCH_SFTP_PASS='your-password'"
+# Fall back to ~/.radwatch_env only if the var isn't already set.
+# This preserves any one-off override from the calling shell or crontab.
+if [ -z "${RADWATCH_SFTP_PASS:-}" ] && [ -f "$HOME/.radwatch_env" ]; then
+    # shellcheck disable=SC1090,SC1091
+    source "$HOME/.radwatch_env"
+fi
+
+if [ -z "${RADWATCH_SFTP_PASS:-}" ]; then
+    echo "ERROR: RADWATCH_SFTP_PASS is not set and ~/.radwatch_env did not define it."
+    echo "  Run 'bash setup.sh' from the repo root to be prompted for the password,"
+    echo "  or see docs/runbook.md §5 for manual setup."
     exit 1
 fi
 
