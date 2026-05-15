@@ -261,6 +261,37 @@ Three small operational fixes, each committed separately.
 
 **Server pull note:** `git rm --cached` only removes from the index, not the working tree. When you pull on the server, git sees the files as newly-untracked (matched by .gitignore) and leaves them in place. Your `weatherhawk.csv` (with the 107k rows of scraped history) stays safely on disk. If you want to be paranoid, back it up before pulling (`cp weatherhawk.csv weatherhawk.csv.safety`) — it's not a file we'd want to lose.
 
+### 2026-05-15: Correct the Year-Folder Filter (Earlier "Fix" Was Based on the Wrong Layout)
+
+**Problem:** After deploying the date-dir filter tightening earlier today, the pipeline started reporting `No new files to process (start_index=0, end_index=0)` on every run — meaning the filtered file list was empty. The stale `temp_test_folder/` marker stayed in place because the new run couldn't process anything and therefore never wrote a new marker.
+
+**Root cause:** I had the on-disk Dropbox layout wrong. I'd been writing the filter and its comments as if files lived at `current/<date-dir>/<file>.CNF` (e.g. `current/2026-05-15-acq/Roof_xxx.CNF`), but the actual layout has always been `current/<YYYY>/<file>.CNF` — year-named folders containing CNFs directly, with the date stamp in the CNF *filename* rather than the parent dir. The earlier regex `r'/\d{4}-\d{2}-\d{2}[^/]*/[^/]+$'` required a date-named parent dir that doesn't exist here, so it rejected every legitimate file.
+
+The original regex (`r'/\d{4}-\d{2}-\d{2}'`) worked accidentally: it matched the date substring inside CNF filenames (positionally `/<date>` because CNF filenames start with a date), which let legitimate files through — but it also let `temp_test_folder/` files through for the same reason, which is what corrupted the marker in the first place.
+
+**Change:** Tighten the filter on the actual distinguishing feature — the parent directory being a 4-digit year:
+
+```python
+date_dir_re = re.compile(r'/\d{4}/[^/]+$')
+```
+
+This accepts `current/2025/<anything>.CNF` and `current/2026/<anything>.CNF` while rejecting `current/temp_test_folder/<anything>.CNF`. The date stamp in the filename is no longer load-bearing for the filter — the parent dir being a year is the constraint that matters. Also added a `print` of the pre-filter glob count so future "filter rejected everything" cases are easier to diagnose from the log alone.
+
+**Test:** Added `test/test_date_dir_filter.py` — a standalone script with concrete path cases (legitimate year folders accepted, `temp_test_folder/` rejected, three-level paths rejected, two-digit year rejected, date-named-folder rejected, bare directory rejected). Runs with `python3 test/test_date_dir_filter.py` from the repo root. No pytest dependency; exits non-zero on failure.
+
+**Self-heal continues to work:** The existing `temp_test_folder/` marker still won't be in the filtered list (parent dir isn't 4-digit), so the self-heal still fires, deletes the marker, falls into the "last 10000 files" path. This time the filtered list is non-empty, so processing proceeds and a fresh marker gets written pointing at a real `current/YYYY/...CNF` file.
+
+**Lesson for future me:** The earlier logbook entry talking about "date-named directories" was based on an incorrect mental model of the layout. The directory structure has always been year folders at the top level. The earlier `temp_test_folder/` diagnosis was correct, but the surrounding context about how legitimate paths get matched was wrong, which led directly to over-tightening the regex. When changing path-matching code, look at actual paths first — `ls .../current/ | head` would have caught this in seconds.
+
+**Deploy:** Pull, then run `bash image_scripts/analysis/cron_job.sh` (or wait for the next hourly cron). The first run should:
+1. Detect the stale marker (now uses the corrected log line `Glob found N CNFs before filtering` → `Found M spectral files (after filtering to year-named directories)`).
+2. Self-heal: delete the stale marker, take the "last 10000 files" path.
+3. Process the missing week (or more) of CNFs.
+4. Write a fresh marker pointing at the lexicographic tail of the cleaned list — a real `current/YYYY/Roof_YYYY-MM-DD_xxx.CNF` file.
+5. Subsequent cron runs work normally.
+
+---
+
 ### 2026-05-15: Durable SFTP Credential Storage via `~/.radwatch_env`
 
 **Problem:** The 2026-04-17 commit `49d062e` moved the SFTP password out of `deploy.sh` into a `RADWATCH_SFTP_PASS` env var but never put it anywhere durable — the logbook explicitly noted this as an open issue at the time. The May 15 reboot wiped the value from the interactive shell where it had been set, and the next pipeline run hit `ERROR: RADWATCH_SFTP_PASS not set`. Symptom on the website: stale plots because deploy was failing every cron tick.

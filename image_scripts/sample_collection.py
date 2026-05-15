@@ -661,21 +661,25 @@ class SampleCollection:
         import re
         file_pattern = spec_dir + '*/*.CNF'
         print(f"Searching for files matching pattern: {file_pattern}")
-        fil_list = glob.glob(file_pattern)
-        # Filter to only files whose immediate parent directory is date-formatted
-        # (YYYY-MM-DD*), to exclude test folders like temp_test_folder/ that
-        # sort lexicographically after the real date dirs.
+        fil_list_raw = glob.glob(file_pattern)
+        print(f"Glob found {len(fil_list_raw)} CNFs before filtering")
+        # The on-disk layout is `current/YYYY/<file>.CNF` — year-named folders
+        # at the top level, each containing CNFs whose filenames include a
+        # date stamp (e.g. Roof_2025-08-15_001.CNF). The filter requires the
+        # immediate parent directory to be a 4-digit year, which is what
+        # distinguishes legitimate paths from test/scratch folders like
+        # `temp_test_folder/` that may contain CNFs with date-stamped names
+        # but should not be processed.
         #
-        # The regex anchors the date to the parent dir (the path segment
-        # immediately before the filename), not anywhere in the path. Earlier
-        # versions used r'/\d{4}-\d{2}-\d{2}' which also matched dates embedded
-        # in CNF filenames (e.g. Roof_2025-08-15_xxxx.CNF), so files inside
-        # non-date dirs leaked through — and because their full paths sort
-        # after date-named dirs, they became the lexicographic tail of fil_list,
-        # corrupting the last_processed.txt marker on every run.
-        date_dir_re = re.compile(r'/\d{4}-\d{2}-\d{2}[^/]*/[^/]+$')
-        fil_list = [f for f in fil_list if date_dir_re.search(f)]
-        print(f"Found {len(fil_list)} spectral files (after filtering to date directories)")
+        # Earlier regexes either matched too loosely (r'/\d{4}-\d{2}-\d{2}'
+        # matched the date inside CNF filenames anywhere in the path, so
+        # temp_test_folder/ files leaked through and corrupted the marker)
+        # or too strictly (r'/\d{4}-\d{2}-\d{2}[^/]*/[^/]+$' required a
+        # date-named parent dir that doesn't exist in this layout, so the
+        # filter rejected everything).
+        date_dir_re = re.compile(r'/\d{4}/[^/]+$')
+        fil_list = [f for f in fil_list_raw if date_dir_re.search(f)]
+        print(f"Found {len(fil_list)} spectral files (after filtering to year-named directories)")
         fil_list.sort()
 
         # Determine starting point based on last processed file
