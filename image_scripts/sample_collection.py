@@ -662,9 +662,18 @@ class SampleCollection:
         file_pattern = spec_dir + '*/*.CNF'
         print(f"Searching for files matching pattern: {file_pattern}")
         fil_list = glob.glob(file_pattern)
-        # Filter to only files in date-formatted directories (YYYY-MM-DD*)
-        # to exclude test folders like temp_test_folder/ that sort incorrectly
-        date_dir_re = re.compile(r'/\d{4}-\d{2}-\d{2}')
+        # Filter to only files whose immediate parent directory is date-formatted
+        # (YYYY-MM-DD*), to exclude test folders like temp_test_folder/ that
+        # sort lexicographically after the real date dirs.
+        #
+        # The regex anchors the date to the parent dir (the path segment
+        # immediately before the filename), not anywhere in the path. Earlier
+        # versions used r'/\d{4}-\d{2}-\d{2}' which also matched dates embedded
+        # in CNF filenames (e.g. Roof_2025-08-15_xxxx.CNF), so files inside
+        # non-date dirs leaked through — and because their full paths sort
+        # after date-named dirs, they became the lexicographic tail of fil_list,
+        # corrupting the last_processed.txt marker on every run.
+        date_dir_re = re.compile(r'/\d{4}-\d{2}-\d{2}[^/]*/[^/]+$')
         fil_list = [f for f in fil_list if date_dir_re.search(f)]
         print(f"Found {len(fil_list)} spectral files (after filtering to date directories)")
         fil_list.sort()

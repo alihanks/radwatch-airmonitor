@@ -261,6 +261,41 @@ Three small operational fixes, each committed separately.
 
 **Server pull note:** `git rm --cached` only removes from the index, not the working tree. When you pull on the server, git sees the files as newly-untracked (matched by .gitignore) and leaves them in place. Your `weatherhawk.csv` (with the 107k rows of scraped history) stays safely on disk. If you want to be paranoid, back it up before pulling (`cp weatherhawk.csv weatherhawk.csv.safety`) — it's not a file we'd want to lose.
 
+### 2026-05-15: Fix Date-Dir Filter Letting Non-Date Folders Through
+
+**Problem:** User reported graphs on the web dashboard had been stuck for ~1 week despite recent CNFs being present in Dropbox. `last_processed.txt` on the server was pointing at a file inside `temp_test_folder/`, the same legacy non-date directory the 2026-04-21 self-heal commit (`84ba072`) was supposed to defend against. The self-heal wasn't firing because the marker file **was** in the filtered list — just at the wrong position.
+
+**Root cause:** `sample_collection.build_collection_incremental` filters its glob results to date-formatted directories with:
+```python
+date_dir_re = re.compile(r'/\d{4}-\d{2}-\d{2}')
+fil_list = [f for f in fil_list if date_dir_re.search(f)]
+```
+The regex matches `/YYYY-MM-DD` **anywhere in the path**, including in CNF filenames (which Canberra acquisitions stamp with a date). So files in `temp_test_folder/` leak through on the strength of the date in their *filename*, not their parent directory. After `fil_list.sort()`, those non-date paths sort lexicographically after the real `2026-MM-DD-...` directories, so the very last entry in `fil_list` is one of these misclassified files. The marker is written as `fil_list[end_index - 1]`, which is now a 2025-named file in `temp_test_folder/`. Every subsequent run computes `start_index = fil_list.index(last_file) + 1 == len(fil_list)` and reports "no new files to process" — silent skip, no error, graphs frozen.
+
+This explains the manual-run report from two weeks ago: that run *did* process the recent data correctly (the iteration covers every file in `fil_list`, not just date-dir files), which is why the user saw a correct graph at the time. But the marker it wrote was wrong, and every cron run since has been a no-op.
+
+**Change (`sample_collection.py`):** Tighten the regex to anchor the date to the immediate parent directory of the CNF, not anywhere in the path:
+```python
+date_dir_re = re.compile(r'/\d{4}-\d{2}-\d{2}[^/]*/[^/]+$')
+```
+Reads as: a slash, then YYYY-MM-DD, then the rest of the parent dir name (`[^/]*`), then `/`, then the filename (`[^/]+`), then end-of-string. The date must start the parent dir, not appear anywhere inside the path. Verified against seven representative paths covering both directions (date-named dirs pass, non-date dirs with date-named files reject, deep paths reject, mid-string dates reject).
+
+**Recovery on the server (no code change needed beyond the pull):** Once this commit is on the server, the existing marker's `temp_test_folder/` path won't be in the filtered list anymore, so the 2026-04-21 self-heal kicks in: it deletes the stale marker, falls into the "last 10000 files" path, and resumes incremental behavior from a fresh marker written at the end of the next successful run — this time pointing at a real date-dir file.
+
+```
+ssh dosenet
+cd ~/radwatch-airmonitor
+git pull
+# next cron run (or a manual `bash image_scripts/analysis/cron_job.sh`) will:
+#   1. detect the temp_test_folder marker is no longer in the filtered list
+#   2. delete it, take the "last 10000 files" path, process the week-long gap
+#   3. write a fresh marker pointing at the most recent real date-dir file
+```
+
+No HDF5 rebuild required — HDF5 dedup on merge handles any overlap if the gap-fill reprocesses some hours that were already in `rebin.h5`.
+
+---
+
 ### 2026-05-15: Diagnose Recurring Server Freezes (SRSO Soft Lockup); Add `maintenance/`
 
 **Problem:** Server had been hanging recurrently — most recently visible as a force-reboot every 1–4 weeks. User asked for help diagnosing.
