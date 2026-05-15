@@ -46,6 +46,20 @@ Known work items that have been flagged but deferred. Each entry notes what the 
 
 ---
 
+## `build_merged_weather` doesn't extend past the last radiation timestamp
+
+**Where:** `image_scripts/analysis/h5_analysis.py`, `build_merged_weather()`.
+
+**Current behavior:** the function starts with the radiation timestamps as the base timeline and only fills CSV weather points into *interior* gaps (`for i in range(1, len(rad_timestamps))`). CSV weather points that fall **after** the last radiation timestamp are silently dropped.
+
+**Why it matters:** if the detector stops for any reason — even briefly — the weather subplots on `iso_*.png` won't show data for the trailing window between the last radiation sample and now, even though `weather_sorted.csv` has those entries. Surfaced as the "missing weather" symptom during the 2026-05-15 stale-marker incident: weather looked broken because radiation was stuck two weeks back, and the merged timeline couldn't reach past that.
+
+**What a fix would look like:** after the interior-gap loop, append any CSV entries with `timestamp > rad_timestamps[-1]` to `merged_ts` / `merged_*`, then re-sort. Single-digit lines of code. Worth doing because it makes the weather subplots an honest "what we know" view independent of detector availability, and would have made the 2026-05-15 incident easier to spot (weather would have stayed current while radiation went stale, signaling clearly which pipeline was broken).
+
+**Why deferred:** the immediate fix for the 2026-05-15 incident (date-dir regex tightening) restored radiation flow, so the symptom went away on its own. But the underlying tail-gap limitation in `build_merged_weather` remains, and will manifest again the next time radiation stops while the weather scraper keeps running.
+
+---
+
 ## Architecture doc refresh (low priority)
 
 **Where:** `docs/architecture.md`.
