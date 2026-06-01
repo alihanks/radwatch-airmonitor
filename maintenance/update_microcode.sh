@@ -41,8 +41,10 @@ report() {
 
     echo
     echo "=== SRSO mitigation status ==="
+    local srso_status=""
     if [ -r /sys/devices/system/cpu/vulnerabilities/spec_rstack_overflow ]; then
-        cat /sys/devices/system/cpu/vulnerabilities/spec_rstack_overflow
+        srso_status="$(cat /sys/devices/system/cpu/vulnerabilities/spec_rstack_overflow)"
+        echo "$srso_status"
     else
         echo "(spec_rstack_overflow not exposed; CPU may be unaffected or kernel too old)"
     fi
@@ -50,6 +52,37 @@ report() {
     echo
     echo "=== Installed microcode packages ==="
     dpkg -l 2>/dev/null | grep -E "amd64-microcode|intel-microcode" || echo "(none installed)"
+
+    # Verdict: interpret the SRSO status in plain English so the operator knows
+    # whether to expect a fix from another microcode round, a BIOS update, or
+    # the spec_rstack_overflow=off kernel-param workaround.
+    if [ -n "$srso_status" ]; then
+        echo
+        echo "=== Verdict ==="
+        case "$srso_status" in
+            *"no microcode"*)
+                echo "Kernel has fallen back to the Safe RET software mitigation because no"
+                echo "IBPB-extending microcode is loaded. For Zen 1/2 (e.g. Ryzen 1xxx/2xxx),"
+                echo "AMD never published such microcode -- your microcode revision is already"
+                echo "at the ceiling amd64-microcode can deliver, and a BIOS update will not"
+                echo "change that either."
+                echo
+                echo "If the system is hanging with srso_return_thunk in the soft-lockup stack,"
+                echo "the practical fix is to disable the software mitigation via kernel"
+                echo "parameter. See docs/runbook.md section 7a for the GRUB edit."
+                ;;
+            *"Mitigation: Safe RET"*|*"Mitigation: IBPB"*)
+                echo "SRSO is fully mitigated (software + microcode). No further action needed."
+                ;;
+            *Vulnerable*)
+                echo "CPU is reported vulnerable to SRSO with no mitigation applied. Investigate"
+                echo "kernel boot parameters (mitigations=off?) and /etc/default/grub."
+                ;;
+            *"Not affected"*)
+                echo "This CPU is not affected by SRSO; no mitigation needed."
+                ;;
+        esac
+    fi
 }
 
 if [ "$CHECK_ONLY" -eq 1 ]; then
