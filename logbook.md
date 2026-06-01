@@ -17,6 +17,85 @@ The RadWatch air monitor is a rooftop gamma-ray spectroscopy system at UC Berkel
 
 ---
 
+## Pre-Logbook History (2014 – 2026-02)
+
+The detailed entries below begin at 2026-02-17, but the rooftop air monitor has been running since 2014. This section back-fills the high-level history so a new collaborator has the same starting context.
+
+Three things to know up front:
+
+- **The system long predates this repo.** The detector and analysis code went live in 2014 on an older Berkeley server. It ran essentially untouched from 2014 until ~2020. Earlier hardware maintenance was recorded in physical paper logbooks kept with the rooftop hardware — those still exist but aren't transcribed here.
+- **The git history starts at 2020-06-26** (`1fa93db` "First addition"), which is when the code was first put under version control. The codebase in that initial commit was already the operational system, handed over from the original author.
+- **Most of the 2020-2025 work was migration, not new development.** The pipeline was repeatedly broken by changes one layer down — server hardware, DAQ software, detector firmware, weather station — and each cycle required code updates to come back online. Multiple students contributed during these migrations.
+
+### 2014: Initial deployment
+
+The rooftop gamma-spectroscopy system was built and brought online in 2014 by previous group members (led by Mark B. and Ryan P.). Original author handed off the code later. The system collected CNF spectra and produced isotope time-series plots in essentially the form it still does today.
+
+No git history; physical logbooks at the rooftop are the only record of work in this period.
+
+### ~2014 – 2020: Steady-state operation
+
+The system ran on a Berkeley server (`rtpavlovsk21`) for several years without significant code changes. Hardware maintenance happened periodically and was logged on paper.
+
+### 2020-06 (`1fa93db`): Airflow hardware replacement, code first put in git
+
+The airflow hardware was replaced and the system needed to be brought back online. At the same time the original code author handed the project over to the RadWatch lead. The handover prompted putting the existing codebase into git so future changes could be tracked properly.
+
+The initial commit dumps the whole operational tree as it stood: `acquire.py` for data acquisition, `image_scripts/` for the analysis and plotting, the bundled `windrose/` library, `admin_stuff/` for server housekeeping, and `crontab.txt`. Many of those files are still in the repo today.
+
+### 2022 – 2023: Detector hardware repair, DAQ upgrade GENIE 2.0 → 4.0
+
+The detector hardware was repaired, and at the same time the DAQ computer and Canberra GENIE acquisition software were upgraded from version 2.0 to 4.0. The 2023-11 commits (5 commits to `acquire.py`) date from this period — incremental fixes to the acquisition side to work with the new GENIE.
+
+The GENIE upgrade had downstream consequences on the analysis side: the binary structure of CNF files changed between versions, breaking the existing parser. This shows up as the "xylib" problem in 2025 (see below).
+
+### 2024-04 (`3a70fee`): `.gitignore` added
+
+Routine housekeeping.
+
+### 2024-11 (`f2aecfb`, `82437d5`): Server migration `rtpavlovsk21` → `dosenet`
+
+The original server hardware failed and needed to be replaced. The migration was used as an opportunity to move from a personal user account to a shared `dosenet` project account on the new machine, so the system wouldn't be tied to one individual's login again.
+
+`f2aecfb` by `vihk` is a mass find-and-replace of all the embedded path strings from the old user account to the new project account. Modern code that still hard-codes `/home/dosenet/radwatch-airmonitor/...` traces back to this rename.
+
+### 2025-04 – 2025-08: Python 2 → 3 transition, started
+
+The new `dosenet` machine ran a newer OS and Python 3 was the only Python in PATH. The 2025-04 commits begin the Python 2 → 3 conversion of the analysis code; student `jordan`'s 2025-07-29 `b74202b` "Updates scripts to python3" continued it.
+
+The bulk of the syntactic conversion was done in this stretch but the pipeline wasn't yet working end-to-end — the binary CNF parser was the blocker (see next entry).
+
+### 2025-08 (`cd7923f`, PR #1 from `DerpCake1`): "Fixes everything but the xylib functions"
+
+The commit message captures the state at that point: the Python 3 conversion was largely done, but the CNF parsing (which the original code did via the `xylib` library) was still broken. The GENIE 4.0 binary format change meant `xylib`'s reader no longer matched what the detector was writing. The xylib problem was the central code-side blocker on getting the system back online during this period.
+
+### 2025-10 (`a6027d1`, `385fbdd`): xylib replaced, new setup, becquerel experiment
+
+`a6027d1` "updates for python3 and new setup" — Python 3 conversion ends, full pipeline working end-to-end. The xylib dependency was replaced with a new CNF parser (the `cnf_parser_standalone.py` currently in the repo, which reads the GENIE 4.0 binary format directly).
+
+`385fbdd` "changes for using becquerel" was exploratory work that wasn't kept. The pipeline now uses the in-repo standalone parser (`cnf_parser_standalone.py`), which still needs work — **livetime and start/stop time are not yet recovered from the CNF binary by this parser**, and downstream code currently treats nominal values as a stand-in. See `docs/todo.md`.
+
+### 2025-10 – 2025-11: New weather station + weather code (vl20220303)
+
+In parallel with the Python 3 / parser work, the weather station was being replaced and the weather data path needed to be rebuilt. Student `vl20220303` wrote the current `weather_gatherer.py` (Weather Underground scraper) and `weatherhawk.csv` workflow.
+
+- `b649b92` 2025-10-22 "Added weather data gathering script"
+- `964c1cf` 2025-11-08 "Update weather_gatherer to append to weatherhawk.csv"
+
+### 2025-11 (`7a49ae5`): "modifications for new cnf file format"
+
+Detector-side firmware change produced CNF files in a slightly different format. Small parser adjustment to keep up.
+
+### 2025-12 – 2026-01: Quiet stretch
+
+Two commits across two months. By this point the pipeline was working again post-migration and the active push was paused.
+
+### 2026-02-17 onward: In-repo logbook begins
+
+The dated entries below take over from here. The 2026-02-17 work fixed several accumulated bugs that surfaced once the pipeline was being run in earnest again, and from that point on the logbook is the canonical record.
+
+---
+
 ## Work Log
 
 ### 2026-02-17: Initial Pipeline Fixes (`899e295` .. `9ed68de`)

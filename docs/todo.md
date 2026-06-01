@@ -4,6 +4,20 @@ Known work items that have been flagged but deferred. Each entry notes what the 
 
 ---
 
+## Standalone CNF parser: livetime and start/stop time not yet recovered
+
+**Where:** `image_scripts/cnf_parser_standalone.py`.
+
+**Current behavior:** the in-repo standalone parser replaced the old `xylib` reader when the GENIE 4.0 binary format change broke `xylib`. It successfully extracts the channel counts (the spectrum itself), but does not yet recover the spectrum's livetime or its acquisition start/stop timestamps from the CNF binary. Downstream code treats nominal values as a stand-in (`PRESET_LIVETIME = 300.0` in `raw_analysis.py`; spectrum timestamps come from filename mtime / file metadata rather than the in-file fields).
+
+**Why it matters:** the K-40 livetime-correction mechanism (see `docs/runbook.md` §3) exists in part because real livetime is unavailable — corrections are inferred from K-40 count rate instead. With real livetime fields, the K-40 livetime correction could be cross-checked against the truth value, edge cases handled more cleanly, and the QA filter tightened. The start/stop times would also let the pipeline distinguish "spectrum acquired 04:00-04:05" from "file written at 04:05," which matters for fine-grained gap detection.
+
+**What a fix would look like:** add CNF binary-block parsing for the livetime and acquisition-time fields to `cnf_parser_standalone.py`. Reference: the Canberra GENIE CNF format spec (or the original `xylib` source code that read these fields successfully before the format change). Once recovered, expose them via `Sample.live_time` and `Sample.timestamp` directly, and remove the `PRESET_LIVETIME` fallback in `raw_analysis.py`.
+
+**Why deferred:** the K-40-based livetime correction is working well enough that the pipeline produces useful plots; this is a quality improvement, not a blocker.
+
+---
+
 ## Weather parser: missing values as 0.0 vs NaN
 
 **Where:** `image_scripts/weather_utils.py`, `parse_weather_data`.
