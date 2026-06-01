@@ -60,6 +60,18 @@ Known work items that have been flagged but deferred. Each entry notes what the 
 
 ---
 
+## SRSO software-mitigation freeze workaround (pending observation)
+
+**Where:** the dosenet server itself, not the repo. Documented in `docs/runbook.md` §7a.
+
+**Status as of 2026-06-01:** the 2026-05 server freezes were diagnosed as the Linux/AMD SRSO Safe-RET soft-lockup bug on Zen 1 hardware. The microcode-update path (`maintenance/update_microcode.sh`) has been run and confirmed there is no further microcode AMD can deliver for this CPU (Ryzen 7 1700X = Zen 1; AMD published IBPB-extending microcode only for Zen 3/4). The remaining fix is the GRUB kernel parameter `spec_rstack_overflow=off`, documented in the runbook.
+
+**Deferred because:** the user wants to observe whether the freezes recur over the next few days before applying the workaround. The maintenance script and runbook are in place so the change is one short edit + `update-grub` + reboot if needed.
+
+**What a fix would look like:** the runbook §7a step 2 has the exact commands. The kernel param disables the software-only Safe-RET mitigation, which is the layer carrying the soft-lockup bug. Trade-off: the CPU then exposes SRSO to local attackers, which is acceptable for this single-purpose lab server.
+
+---
+
 ## Architecture doc refresh (low priority)
 
 **Where:** `docs/architecture.md`.

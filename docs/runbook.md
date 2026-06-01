@@ -162,6 +162,7 @@ grep "Deploying\|Deploy exit code" data/pipeline.log | tail -10
 - Cron not running at all (user changed, conda path broken, host rebooted without re-adding env).
 - Dropbox desktop daemon stopped syncing (no new directories in `current/`).
 - Stale `last_processed.txt` pointing to a removed directory (pipeline sees "nothing new").
+- `h5_analysis.py` crashing partway through plot generation (e.g. windrose receiving NaN wind data). Signature in the log: a Python traceback from `h5_analysis.py` followed by `h5_analysis.py exit code: <nonzero>`, then later the deploy still runs and uploads whatever stale PNGs are already in `data/`. The PNGs in `data/` will have an mtime stuck at the last successful run rather than advancing every hour. See the 2026-06-01 logbook entry for the windrose-NaN case; the fix landed in `weather_utils.draw_windrose`.
 - SFTP deploy failing (plots are fresh on server but not uploaded).
 
 ---
@@ -316,6 +317,8 @@ If all four are present, the freeze is the known Linux/AMD SRSO software-mitigat
    bash maintenance/update_microcode.sh --check
    ```
    Confirm the post-reboot `--check` shows a higher microcode revision in `/proc/cpuinfo` and that the "IBPB-extending microcode not applied!" line is no longer in dmesg. If both true, the bug is likely resolved.
+
+   **Known result for the current dosenet hardware (Ryzen 7 1700X, Zen 1):** the script's verdict block will say `no microcode` and confirm that AMD never published an IBPB-extending microcode for Zen 1/2. The `amd64-microcode` package is already at its ceiling for this CPU, and BIOS update (step 3) will not change that either. On Zen 1/2 specifically, skip directly to step 2.
 
 2. **If microcode update isn't available or doesn't help — disable SRSO mitigation (kernel workaround):**
 
