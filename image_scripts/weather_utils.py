@@ -146,6 +146,23 @@ def draw_windrose(wind_direction,wind_speed,time_win_str,output_dir=None):
     if len(wind_direction) <= 1 or len(wind_speed) <= 1:
         print("Something not right with windrose data at time", time_win_str)
         return
+    # Drop rows with NaN in either input. The HDF5 weather_data dataset stores
+    # NaN for any sample whose CNF timestamp had no matching row in the weather
+    # CSV (gaps in WeatherUnderground scrapes, brief gateway outages, etc.).
+    # The windrose library's bin computation raises ValueError on any NaN, so
+    # left unguarded the very first windrose call (One_Day) crashes h5_analysis
+    # before any isotope timeseries plots are written.
+    wind_direction = np.asarray(wind_direction, dtype=float)
+    wind_speed = np.asarray(wind_speed, dtype=float)
+    valid = ~(np.isnan(wind_direction) | np.isnan(wind_speed))
+    n_dropped = int((~valid).sum())
+    if n_dropped:
+        print(f"Windrose {time_win_str}: dropped {n_dropped} NaN samples")
+    wind_direction = wind_direction[valid]
+    wind_speed = wind_speed[valid]
+    if len(wind_direction) <= 1:
+        print(f"Windrose {time_win_str}: only {len(wind_direction)} valid samples after NaN drop, skipping")
+        return
     from matplotlib.colors import LinearSegmentedColormap
     # windrose like a stacked histogram with normed (displayed in percent) results
     # make the colormap

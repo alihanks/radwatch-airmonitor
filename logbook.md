@@ -318,6 +318,28 @@ The deeper issue was discoverability: nothing in the repo told a future operator
 
 ---
 
+### 2026-06-01: Fix `h5_analysis.py` Crashing on NaN Wind Data
+
+**Problem:** After the year-folder-filter fix went in (commit `80c8e33`), the marker did start advancing past the stale `temp_test_folder/` entry — but the published plots stayed frozen at 2026-04-21 even though `last_processed.txt` moved forward to a 2026-05-15 file. The cron log on 2026-06-01 surfaced the actual reason: `h5_analysis.py` was raising
+
+```
+ValueError: Could not compute the bins due to the presence of NaNs in either the bins provided or original data
+```
+
+inside `windrose.draw_windrose` (windrose package line 393), reached via `h5_analysis.py` line 240 → `weather_utils.draw_windrose` line 156 (`ax.bar(...)`). Because the windrose loop runs before any of the isotope-timeseries plotting (`h5_analysis.py` ~line 234 vs ~line 304+), the first iteration (`One_Day`) crashed the whole script and none of the `iso_*.png` plots ever got regenerated. Cron then `cp`-ed whatever PNGs already existed in `data/` into `rooftop_tmp/` and SFTP-deployed them — the stale 4-21 set, every hour, for weeks.
+
+**Root cause:** `weather[:, 4]` (wind direction) and `weather[:, 5]` (wind speed) come straight out of the HDF5 `weather_data` dataset, which stores NaN for any sample whose CNF timestamp had no matching row in the weather CSV. This is normal — WeatherUnderground scrapes drop intermittently. But the windrose library's bin computation can't handle NaN; any NaN at all in either array raises `ValueError`.
+
+**Why now and not earlier:** the failure mode is "any single NaN sample in the window kills the plot." Plenty of older windows happened to have no NaN samples in the One_Day slice; the gap that opened up around late April apparently produced at least one such sample in every recent One_Day window, so the crash became persistent.
+
+**Change:** `image_scripts/weather_utils.py` — `draw_windrose` now coerces inputs to float arrays, drops rows where either wind direction or speed is NaN, and bails early with a clear message if fewer than 2 valid samples remain. The fix is at the function (not the call site) so any future caller is also protected. The existing `len <= 1` guard is preserved as the outer short-circuit.
+
+**Deploy:** Pull, then run `bash image_scripts/analysis/cron_job.sh`. The cron should now complete through `h5_analysis.py` and write fresh `iso_One_Day.png` / `iso_One_Week.png` / etc., catching the published graphs up to whatever the HDF5 actually contains.
+
+If the plots still don't catch up to 2026-06-01 after this fix, the next thing to check is whether the HDF5 itself has data through that date — `python3 -c "import h5py; f=h5py.File('data/rebin.h5','r'); print(f['data']['timestamps'][-1])"`. If the HDF5 stops earlier than expected, the gap is from K-40 livetime drops or QA filter rejections, not from windrose.
+
+---
+
 ### 2026-05-15: Fix Date-Dir Filter Letting Non-Date Folders Through
 
 **Problem:** User reported graphs on the web dashboard had been stuck for ~1 week despite recent CNFs being present in Dropbox. `last_processed.txt` on the server was pointing at a file inside `temp_test_folder/`, the same legacy non-date directory the 2026-04-21 self-heal commit (`84ba072`) was supposed to defend against. The self-heal wasn't firing because the marker file **was** in the filtered list — just at the wrong position.
