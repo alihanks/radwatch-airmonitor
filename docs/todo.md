@@ -74,15 +74,29 @@ Known work items that have been flagged but deferred. Each entry notes what the 
 
 ---
 
-## SRSO software-mitigation freeze workaround (pending observation)
+## SRSO software-mitigation freeze workaround (APPLIED — resolved the soft-lockups)
 
 **Where:** the dosenet server itself, not the repo. Documented in `docs/runbook.md` §7a.
 
-**Status as of 2026-06-01:** the 2026-05 server freezes were diagnosed as the Linux/AMD SRSO Safe-RET soft-lockup bug on Zen 1 hardware. The microcode-update path (`maintenance/update_microcode.sh`) has been run and confirmed there is no further microcode AMD can deliver for this CPU (Ryzen 7 1700X = Zen 1; AMD published IBPB-extending microcode only for Zen 3/4). The remaining fix is the GRUB kernel parameter `spec_rstack_overflow=off`, documented in the runbook.
+**Status as of 2026-06-09:** RESOLVED for the SRSO failure mode. The 2026-05 server freezes were diagnosed as the Linux/AMD SRSO Safe-RET soft-lockup bug on Zen 1 hardware. The microcode-update path (`maintenance/update_microcode.sh`) confirmed there is no further microcode AMD can deliver for this CPU (Ryzen 7 1700X = Zen 1; AMD published IBPB-extending microcode only for Zen 3/4). The GRUB kernel parameter `spec_rstack_overflow=off` was **applied on the 2026-06-01 reboot** (confirmed present in `/proc/cmdline`). Since then there have been **no SRSO soft-lockups in the logs** — that failure mode is gone.
 
-**Deferred because:** the user wants to observe whether the freezes recur over the next few days before applying the workaround. The maintenance script and runbook are in place so the change is one short edit + `update-grub` + reboot if needed.
+**But a different freeze appeared — see the next item.** The box hung again on 2026-06-07 with a *silent* signature (no soft-lockup logged), which is a separate problem, not an SRSO regression.
 
-**What a fix would look like:** the runbook §7a step 2 has the exact commands. The kernel param disables the software-only Safe-RET mitigation, which is the layer carrying the soft-lockup bug. Trade-off: the CPU then exposes SRSO to local attackers, which is acceptable for this single-purpose lab server.
+## Silent freeze of 2026-06-07 (root cause under investigation)
+
+**Where:** the dosenet server itself. Documented in `docs/runbook.md` §7a and §7e.
+
+**Symptom:** with `spec_rstack_overflow=off` in place, the box ran 6 days (rebooted Mon 06-01, froze Sun 06-07) then hung **silently** — journald's last entry was 03:03, but the pipeline kept running until ~11:00, so the *actual* freeze was ~11:00 and logging died ~8 hours earlier. No soft-lockup, no OOM, no shutdown sequence — the log just stops. The box sat wedged ~2 days until a manual power-cycle on 06-09. A weekly Sunday-03:00 job from the *other* software on the box was briefly suspected but ruled out (it had been crashing early, so it never held a large footprint; a bug in it was found and fixed this session).
+
+**Leading hypothesis:** the root HDD (9-year-old Toshiba on `/`) is developing **intermittent I/O stalls**. "journald dies first, system limps, then silent total freeze" fits a disk-bound failure: journald is the first casualty of bad I/O, and the box locks once enough processes block on stalled I/O, with nothing able to write the cause. Alternatives not yet excluded: memory pressure → swap thrash, thermal, or RAM/PSU.
+
+**Mitigations applied this session (2026-06-09):** added `maintenance/setup_watchdog.sh` (hardware watchdog + reboot-on-panic, caps a hang at ~20s instead of days) and `maintenance/syshealth_logger.sh` (journald-independent vitals logger, so the *next* freeze leaves a trail in `/var/log/syshealth.log`). Both need to be **installed on the server** (`sudo bash maintenance/setup_watchdog.sh`; `sudo bash maintenance/syshealth_logger.sh --install`) and the watchdog **tested** per runbook §7e.
+
+**What's left to do:**
+1. Install + test the watchdog and install the health logger on the server.
+2. Re-check the Toshiba's SMART (`sudo smartctl -a /dev/sdb`) — compare `Reallocated_Sector_Ct` / `Current_Pending_Sector` / SMART error log against the clean May snapshot.
+3. After the next freeze (or if none recurs), read `/var/log/syshealth.log`'s final lines against the §7e fingerprint table to confirm or rule out the I/O-stall hypothesis.
+4. If confirmed disk: replace the HDD (or move `/` to the spare Kingston SSD). If RAM suspected instead: run a memtest86+ pass in a maintenance window.
 
 ---
 

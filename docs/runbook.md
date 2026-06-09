@@ -384,9 +384,82 @@ Look for:
 | Symptom | First place to check |
 |---------|----------------------|
 | Pipeline not updating | `data/pipeline.log` (see §4) |
-| System frozen / unresponsive | `journalctl -k -b -1` (see §7a) |
+| System frozen / unresponsive | `journalctl -k -b -1` (see §7a), then `/var/log/syshealth.log` (see §7e) |
+| Freeze left no kernel logs | `/var/log/syshealth.log` — journald-independent vitals (see §7e) |
+| Want auto-recovery from hangs | watchdog via `maintenance/setup_watchdog.sh` (see §7e) |
 | Disk-related kernel errors | `sudo smartctl -a /dev/sda` and `/dev/sdb` (see §7c) |
 | Memory pressure / OOM kills | `free -h`, `dmesg \| grep -i oom` |
 | High CPU temperatures | `sensors` (install `lm-sensors`) |
 | Network/SFTP failures | `journalctl -u networking`, see §5 for SFTP |
 | Dropbox not syncing | `ps aux \| grep dropbox`, `dropbox status` |
+
+### 7e. Auto-recovery from hangs (watchdog) + health logging
+
+**Why this exists:** The SRSO kernel-parameter workaround (§7a) stopped the *soft-lockup*
+freezes, but on 2026-06-07 the server hung again with a different, silent signature —
+**journald stopped logging ~8 hours before the box fully froze** (last entry 03:03, the
+pipeline limped on until ~11:00), and nothing was written to explain it. The box then sat
+wedged ~2 days until a manual power-cycle. "Logging dies first, system limps, then a
+silent total freeze" is the classic fingerprint of the **root HDD developing intermittent
+I/O stalls** — journald is disk-bound so it's the first casualty, and once enough processes
+block on stalled I/O the whole box locks with nothing left able to write. Root cause is
+still under investigation (re-check the Toshiba's SMART per §7c — `Reallocated_Sector_Ct`,
+`Current_Pending_Sector`, and the SMART error log). The two tools below are independent of
+that root cause: one caps the downtime, the other captures evidence for next time.
+
+**Tool 1 — `maintenance/setup_watchdog.sh` (cap the downtime).** Arms a hardware watchdog
+(the AMD chipset `sp5100_tco`, driven by systemd's `RuntimeWatchdogSec`) plus reboot-on-panic
+sysctls. If the box hangs, it resets itself in ~20s instead of sitting wedged for days.
+
+```bash
+sudo bash maintenance/setup_watchdog.sh        # apply
+bash maintenance/setup_watchdog.sh --check     # report state
+```
+
+- **softdog caveat:** if the chipset watchdog isn't usable (the script warns and falls back
+  to `softdog`), be aware `softdog` depends on the kernel still running and may NOT catch a
+  true hard lockup. Check `dmesg | grep -i watchdog` for `Watchdog hardware is disabled` and
+  whether the BIOS exposes a WDT setting.
+- **The optional `kernel.hung_task_panic` lever** (commented in `/etc/sysctl.d/60-hang-recovery.conf`)
+  reboots the box if any task blocks in D state past the timeout — this directly targets the
+  suspected I/O-stall freeze. Enable it only after watching `syshealth.log` confirm that
+  legitimate workloads don't park a task in D state for 120s (which would cause false reboots).
+
+**Testing it (do this — an untested watchdog is not a safety net):** in a maintenance window,
+confirm the auto-reboot path end-to-end by forcing a kernel panic and watching the box come
+back on its own ~10s later:
+
+```bash
+sudo sysctl kernel.sysrq=1
+echo c | sudo tee /proc/sysrq-trigger    # forces a panic; box should self-reboot
+```
+
+This proves the panic→reboot path. The hardware-watchdog path (silent hang, no panic) is
+hardest to test cleanly while systemd owns the device; the practical confirmations are
+(a) `setup_watchdog.sh --check` shows a real `/dev/watchdog` with a chipset `identity`
+(not just `softdog`), `dmesg` shows the driver registering without "hardware is disabled",
+and (b) the next real hang auto-recovers.
+
+**Tool 2 — `maintenance/syshealth_logger.sh` (capture evidence for next time).** A
+journald-independent resident loop that appends one line of vitals every 30s to
+`/var/log/syshealth.log`, reading mostly from `/proc` (no disk I/O) so it has the best chance
+of recording the final moments before a hang.
+
+```bash
+sudo bash maintenance/syshealth_logger.sh --install     # install + start the service
+bash  maintenance/syshealth_logger.sh --status          # service state + recent lines
+bash  maintenance/syshealth_logger.sh --once            # print one sample now
+```
+
+After the next freeze, `tail` the log and read the final lines — each hypothesis has a
+distinct fingerprint:
+
+| What the last lines show | Likely cause |
+|--------------------------|--------------|
+| `pblk` (procs blocked) climbing, `load` rising, CPU otherwise idle | **disk I/O stall** (leading suspect) — cross-check SMART (§7c) |
+| `memMB` falling toward 0, then `swapMB` falling | **memory leak / pressure** → swap thrash |
+| `tempC` spiking before the cutoff | **thermal** |
+| Values all normal, log just stops abruptly | instant hard lockup (hardware: RAM/PSU) — consider a memtest86+ pass |
+
+The `topproc` column names the biggest memory consumer, so if `memMB` is falling you can see
+*what* is growing. Columns are documented in the script header and in the log's own `#` header line.

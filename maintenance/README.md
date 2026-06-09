@@ -9,5 +9,7 @@ When the dosenet server has issues that aren't about CNF parsing, weather scrapi
 | Script | Purpose |
 |--------|---------|
 | `update_microcode.sh` | Install/upgrade CPU microcode and report SRSO mitigation status. See `docs/runbook.md` §7 for the freeze diagnosis it addresses. |
+| `setup_watchdog.sh` | Arm a hardware watchdog + reboot-on-panic sysctls so the box auto-reboots when it hangs instead of sitting wedged for days. `--check` reports state. See `docs/runbook.md` §7e. |
+| `syshealth_logger.sh` | Journald-independent vitals logger (`--install` as a systemd service) so a freeze leaves a trail in `/var/log/syshealth.log` even when journald dies. See `docs/runbook.md` §7e. |
 
 Run scripts as `sudo bash maintenance/<script>.sh` from the repo root unless the script's own usage note says otherwise. Most include a `--check` mode that reports state without making changes.

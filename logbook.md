@@ -486,6 +486,39 @@ If the SRSO warning persists after reboot, fall back to the kernel-parameter wor
 
 ---
 
+### 2026-06-09: Server Froze Again (Silent, Non-SRSO); Add Watchdog + Health Logger
+
+**Problem:** The server hung again. Important: this is **not** an SRSO regression. The `spec_rstack_overflow=off` workaround from §7a *was* applied on the 2026-06-01 reboot (confirmed in `/proc/cmdline`) and it did its job — there are **no soft-lockup / `srso_return_thunk` entries** in the logs anymore. This was a *different*, silent freeze.
+
+**Timeline:** rebooted Mon 2026-06-01, ran 6 days, hung Sun 2026-06-07, discovered wedged and hard-rebooted 2026-06-09 (~2 days of downtime, pipeline/plots stale that whole time).
+
+**Diagnostic signature (the useful part):**
+- `journalctl -b <frozen>` for that boot ends with ordinary `audit:` lines at **03:03**, no shutdown sequence — i.e. an abrupt death, not a clean reboot.
+- But `data/pipeline.log` shows the hourly pipeline ran until **~11:00**. So the box was *alive* after 03:03 — **journald stopped logging ~8 hours before the actual freeze (~11:00).**
+- No `soft lockup`, no `oom-killer`, no thermal/MCE lines anywhere in the window.
+
+**Interpretation:** "journald dies first, system limps, then a silent total freeze with nothing logged" is the classic fingerprint of the **root disk developing intermittent I/O stalls**. journald is disk-bound, so it's the first casualty; the box fully locks once enough processes block on stalled I/O, and by then nothing can write the cause. The `/` filesystem is on a 9-year-old Toshiba HDD (`/dev/sdb`). Not yet proven — alternatives still open are memory→swap-thrash, thermal, and RAM/PSU — but it's the leading hypothesis. Next confirmation step is re-checking the Toshiba's SMART against the clean May snapshot (§7c).
+
+**A red herring, ruled out:** June 7 was a Sunday, and the *other* software on the box runs a weekly Sunday-03:00 Python job that crunches a year of 5-minute data — which lined up suspiciously with both the 03:03 log cutoff and the 6-day-since-Monday-reboot gap. But that job had actually been **crashing early** every week (a bug the user found and fixed this session), so it never held a large footprint and wasn't the memory hog it looked like. Removed from the suspect list.
+
+**Changes (this is host-OS hygiene, but the host is the production environment, so it lives in the repo next to `update_microcode.sh`):**
+
+- **New: `maintenance/setup_watchdog.sh`** — arms a hardware watchdog (AMD chipset `sp5100_tco`, driven by systemd `RuntimeWatchdogSec=20s`; `softdog` fallback with a loud caveat that it may not catch a true hard lockup) plus reboot-on-panic sysctls (`kernel.panic=10`, `kernel.panic_on_oops=1`, and a commented-out `hung_task_panic` lever aimed at the I/O-stall hypothesis). Turns a multi-day hang into a ~20s self-reboot. `--check` mode reports state.
+- **New: `maintenance/syshealth_logger.sh`** — journald-independent vitals logger. A resident loop reading mostly from `/proc` (no disk I/O) that appends one line every 30s to `/var/log/syshealth.log`: load, **procs-blocked (the I/O-stall signal)**, MemAvailable, SwapFree, temp, root-FS%, and top-RSS process. `--install` drops a systemd service (`syshealth-logger.service`, `Restart=always`, enabled at boot). The point: the next freeze should leave a trail in the final lines even though journald won't.
+- **`docs/runbook.md` §7e** (new) — full write-up: why both tools exist, install commands, the safe **watchdog test procedure** (`echo c > /proc/sysrq-trigger` panic test + honest note on the limits of testing the hardware-watchdog path), and a fingerprint table mapping the health-log's final lines to each candidate cause. §7d symptom table updated to point at the new tools.
+- **`docs/todo.md`** — the SRSO item rewritten from "pending observation" to "APPLIED — resolved the soft-lockups," and a new "Silent freeze of 2026-06-07" item capturing the hypothesis and the remaining steps (install+test on server, re-check SMART, read the health log after the next event, replace HDD / memtest as indicated).
+
+**Deploy (on the server):**
+```
+git pull
+sudo bash maintenance/setup_watchdog.sh
+bash  maintenance/setup_watchdog.sh --check          # confirm a real /dev/watchdog, not softdog
+sudo bash maintenance/syshealth_logger.sh --install
+# then, in a maintenance window, test auto-reboot per runbook §7e
+sudo smartctl -a /dev/sdb                            # re-check the Toshiba vs the May snapshot
+```
+Both installs are persistent across reboots (module via `/etc/modules-load.d/`, systemd service enabled, sysctls in `/etc/sysctl.d/`) — no crontab changes needed.
+
 ### 2026-04-21: Drop Raw Spectra Below K-40 Ratio 0.70
 
 **Problem:** The p75 baseline fix collapsed the wide K-40 dips in the month plot (steady state restored to ~0.33), but narrow residual dips to ~0.15–0.25 remained at the start/end of continuous data runs. These are likely raw spectra that are bad in ways beyond just short livetime (gain shift, partial readout, electronics issue during stop/start) — the linear `livetime = preset × ratio` model assumes K-40 deficit is purely a livetime problem, and that assumption stops being trustworthy much below a ratio of ~0.70.
