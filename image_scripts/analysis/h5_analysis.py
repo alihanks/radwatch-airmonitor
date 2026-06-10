@@ -9,6 +9,7 @@ import time
 import sys
 import os
 import numpy as np  # Adding numpy import that was implied but not explicit
+import pytz
 sys.path.insert(0, '/home/dosenet/radwatch-airmonitor/')
 sys.path.insert(0, '/home/dosenet/radwatch-airmonitor/image_scripts')
 sys.path.insert(0, '..')
@@ -21,6 +22,22 @@ from image_scripts.spectrum_calibration import read_calibration_file
 
 PROJECT_ROOT = '/home/dosenet/radwatch-airmonitor'
 DATA_DIR = os.path.join(PROJECT_ROOT, 'data')
+
+# The HDF5 'timestamps' are UTC epoch seconds. The weather CSV timestamps are
+# naive US/Pacific wall-clock (weather_utils.parse_date_to_struct, stripped to
+# naive in this file). For the weather merge to line radiation and weather up on
+# the same clock, radiation times must be on that same Pacific wall-clock too.
+# The old conversion (fromtimestamp(mktime(gmtime(el)))) produced UTC wall-clock,
+# ~7-8h off from the weather, which is why merged weather didn't fill radiation
+# gaps correctly. Convert UTC epoch -> aware UTC -> Pacific -> naive Pacific.
+PACIFIC_TZ = pytz.timezone('US/Pacific')
+
+
+def epoch_to_local_naive(epoch_seconds):
+    """Convert a UTC epoch timestamp to naive US/Pacific local time."""
+    return (datetime.datetime.fromtimestamp(epoch_seconds, tz=pytz.utc)
+            .astimezone(PACIFIC_TZ)
+            .replace(tzinfo=None))
 
 def build_merged_weather(rad_timestamps, hdf5_weather, csv_timestamps, csv_temp,
                          csv_pres, csv_rain, csv_solar, gap_threshold_sec):
@@ -225,7 +242,7 @@ clf()
 #fix timestamps
 timestamps = []
 for el in tmstmps:
-    timestamps.append(datetime.datetime.fromtimestamp(time.mktime(time.gmtime(el))))
+    timestamps.append(epoch_to_local_naive(el))
 
 clf()
 
@@ -279,8 +296,7 @@ if len(gap_indices) > 0:
     new_roi = list(roi_array)
     nan_roi_row = np.full((roi_array.shape[1], roi_array.shape[2]), np.nan)
     for idx in reversed(gap_indices):
-        mid_time = datetime.datetime.fromtimestamp(
-            time.mktime(time.gmtime((tmstmps[idx-1] + tmstmps[idx]) / 2)))
+        mid_time = epoch_to_local_naive((tmstmps[idx-1] + tmstmps[idx]) / 2)
         new_timestamps.insert(idx, mid_time)
         new_roi.insert(idx, nan_roi_row)
     timestamps = new_timestamps
