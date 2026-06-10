@@ -4,6 +4,44 @@ Known work items that have been flagged but deferred. Each entry notes what the 
 
 ---
 
+## Detector gain drift (HV instability) — daily data loss, recovery in progress
+
+**Root cause (hardware):** The rooftop detector's HV control / gain stabilization is
+not holding gain steady. On a daily cycle (correlated with daytime, almost certainly
+thermal — the detector is on the roof and heats in the sun), the gain drifts, which
+slides the photopeaks — including K-40 (1460 keV) — out of their fixed-channel ROI
+windows. **This is a real hardware fault and the primary fix is on the physical
+system (HV controls / gain stabilization), which the RadWatch lead is handling.**
+
+**How it shows up in the data:** The pipeline's K-40 livetime filter
+(`K40_LIVETIME_MIN_RATIO = 0.70` in `raw_analysis.py`) was built to drop *short-livetime*
+spectra, inferring livetime from K-40 counts (the standalone parser can't read true
+livetime — see the entry below). But a gain-drifted spectrum has a *fine* livetime and
+real data — the K-40 peak has just moved out of the ROI, so its counts collapse (ratios
+seen going to ~0.08 and even **negative**, which short livetime physically can't produce).
+The filter misreads this as "bad livetime" and drops it. Result: ~6–10 hours of good data
+discarded every day (489 spectra across the 2026-06-10 logs), showing as daily radiation
+gaps. Diagnosed 2026-06-10 from `pipeline.log` `K40 spectrum drop` lines + `rebin.h5`
+timestamp gaps (drops cluster in local daytime, ~zero overnight).
+
+**Software mitigation (in progress, branch `k40-gain-drift-recovery`):**
+1. **On-the-fly gain-shift correction** — per spectrum, locate the natural background
+   anchor lines (Bi-214 609 keV, K-40 1460 keV, Tl-208 2614 keV), validate them against
+   their expected relative positions, fit a per-spectrum energy calibration (slope+offset),
+   and recompute ROIs on the drifted positions so the data is *recovered* instead of
+   dropped. Drop only when no trustworthy fit is possible. Store the per-spectrum gain in
+   `rebin.h5`.
+2. **Corrected waterfall plot** (website) — spectra resampled onto the standard energy
+   grid; peaks stay aligned. A "nice plot" and a public view.
+3. **1-D gain-vs-time plot** (technical, NOT on website) — the stored per-spectrum gain
+   over time, so we can catch the HV drift while it's happening and confirm when the
+   hardware fix lands.
+
+**Backfill:** recovery applies going forward automatically; the historical daytime gaps
+need a one-time full rebuild (the RadWatch lead will run it).
+
+---
+
 ## Standalone CNF parser: livetime and start/stop time not yet recovered
 
 **Where:** `image_scripts/cnf_parser_standalone.py`.
