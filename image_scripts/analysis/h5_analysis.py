@@ -303,13 +303,32 @@ if len(gap_indices) > 0:
     roi_array = np.array(new_roi)
     print(f"Data expanded from {s[0]} to {len(timestamps)} points (with NaN breaks)")
 
-# Build merged weather timeline: HDF5 data where radiation exists, CSV data in gaps
+# Weather timeline comes straight from the continuous CSV, fully decoupled from
+# the radiation timeline. The per-radiation-sample weather stored in rebin.h5
+# (weather_data) is unreliable -- it is NaN wherever no CSV row matched the
+# spectrum timestamp, which is most samples. The old radiation-anchored merge
+# therefore drew weather only inside the radiation GAPS (the CSV fill) and left
+# it blank where radiation had data -- exactly anti-phased with the radiation.
+# The weather station records continuously, so the sorted CSV is the correct,
+# complete source, and both timelines now share the same naive-local clock.
 if csv_weather_available:
-    weather_timestamps, weather_temp, weather_pres, weather_rain, weather_solar = build_merged_weather(
-        rad_timestamps, weather, csv_weather_timestamps, csv_weather_temp,
-        csv_weather_pres, csv_weather_rain, csv_weather_solar, GAP_THRESHOLD_SEC)
-    print(f"Merged weather timeline: {len(weather_timestamps)} points")
+    # Cap at the most recent radiation sample: if the detector stops, the graph
+    # should freeze with it rather than keep marching forward on weather alone.
+    # So drop any CSV weather newer than the last radiation timestamp. Both
+    # timelines are naive-local, so the comparison is valid.
+    last_rad = max(rad_timestamps)
+    weather_timestamps, weather_temp, weather_pres, weather_rain, weather_solar = [], [], [], [], []
+    for i in range(len(csv_weather_timestamps)):
+        if csv_weather_timestamps[i] <= last_rad:
+            weather_timestamps.append(csv_weather_timestamps[i])
+            weather_temp.append(csv_weather_temp[i])
+            weather_pres.append(csv_weather_pres[i])
+            weather_rain.append(csv_weather_rain[i])
+            weather_solar.append(csv_weather_solar[i])
+    print(f"Weather timeline from CSV: {len(weather_timestamps)} of "
+          f"{len(csv_weather_timestamps)} points (capped at last radiation {last_rad})")
 else:
+    # Fallback only (no CSV present): use the sparse/often-NaN HDF5 weather.
     weather_timestamps = rad_timestamps
     weather_temp = list(weather[:, 0])
     weather_pres = list(weather[:, 1])
