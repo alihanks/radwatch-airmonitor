@@ -12,5 +12,5 @@ Pillow>=12.1,<12.2
 pytz>=2026.1
 lxml>=5.3,<5.4
 
-# Optional: only needed for interactive calibration notebooks
-# scipy
+# Required by gain_stabilization.py (scipy.signal.find_peaks) since 2026-06-11
+scipy

@@ -24,21 +24,40 @@ discarded every day (489 spectra across the 2026-06-10 logs), showing as daily r
 gaps. Diagnosed 2026-06-10 from `pipeline.log` `K40 spectrum drop` lines + `rebin.h5`
 timestamp gaps (drops cluster in local daytime, ~zero overnight).
 
-**Software mitigation (in progress, branch `k40-gain-drift-recovery`):**
-1. **On-the-fly gain-shift correction** — per spectrum, locate the natural background
-   anchor lines (Bi-214 609 keV, K-40 1460 keV, Tl-208 2614 keV), validate them against
-   their expected relative positions, fit a per-spectrum energy calibration (slope+offset),
-   and recompute ROIs on the drifted positions so the data is *recovered* instead of
-   dropped. Drop only when no trustworthy fit is possible. Store the per-spectrum gain in
-   `rebin.h5`.
-2. **Corrected waterfall plot** (website) — spectra resampled onto the standard energy
-   grid; peaks stay aligned. A "nice plot" and a public view.
-3. **1-D gain-vs-time plot** (technical, NOT on website) — the stored per-spectrum gain
-   over time, so we can catch the HV drift while it's happening and confirm when the
-   hardware fix lands.
+**Two failure modes, established from raw CNFs (2026-06-11):** the 2025-era problem was
+**gain drift** (peaks slide smoothly in channel space, counts conserved — recoverable in
+software), while the 2026 problem is **collapse** (response above a few hundred keV drops
+out entirely, counts lost — NOT recoverable; 2026-05-13 ~10:00–20:00 with recovery,
+2026-06-10 from ~10:30 until the service shutdown; 2026-06-08 shows a mild +3.5% afternoon
+gain excursion with degraded resolution — likely the same mechanism not fully tipping over).
+Calibration correction is irrelevant to collapse; for collapse the software job is
+*detection*, and the hardware fix is the real fix.
 
-**Backfill:** recovery applies going forward automatically; the historical daytime gaps
-need a one-time full rebuild (the RadWatch lead will run it).
+**Software status (branch `k40-gain-drift-recovery`):**
+1. **DONE — validated gain engine** (`image_scripts/gain_stabilization.py`):
+   calibration-agnostic per-spectrum calibration from the natural background lines
+   (it does not trust any prior calibration — validated across the 4096→8192 channel
+   change). Candidate peaks ranked by prominence (not height); fit uses the strong lines
+   only (352/609/1120/1461); **Tl-208 is confirm-only, never in the fit** (noisy centroid
+   + longest lever arm = drags slope); slope band constrained around the
+   channel-count-expected value; temporal-consistency second pass (gain is continuous →
+   discard physically impossible jumps, rescue refusals with a neighbor-centered band).
+   Validation on raw 300 s CNFs: 2025-04-23 drift day 276/280 fit, smooth daily gain
+   track 0.66→0.735 keV/ch recovered, peaks straighten to vertical in the corrected
+   waterfall; 2026-06-08 stable day 277/278 fit, slope pinned at nominal (no-op),
+   collapse/degraded spectra honestly refused.
+2. **TODO — wire into `raw_analysis.py`**: run `fit_collection_gains` on new raw spectra
+   before the K-40 livetime step, `correct_counts` the recoverable ones, store the
+   per-spectrum gain_ratio in `rebin.h5`, and only then apply the K-40 filter. Requires
+   scipy on the server (`conda install scipy` — now in environment.yml).
+3. **TODO — plots in `h5_analysis.py`**: corrected waterfall (website) + gain_ratio /
+   calibration-coefficients vs time (technical, not website; prototyped 2026-06-11).
+   A high-energy-integral health metric should accompany them to flag collapse mode,
+   plus peak-width (resolution) tracking — degraded resolution preceded the 06-08
+   excursion and may be the earliest warning.
+
+**Backfill:** recovery applies going forward automatically once wired in; the historical
+drift-era gaps need a one-time full rebuild (the RadWatch lead will run it).
 
 ---
 

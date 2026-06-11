@@ -486,6 +486,60 @@ If the SRSO warning persists after reboot, fall back to the kernel-parameter wor
 
 ---
 
+### 2026-06-11: Gain-Stabilization Engine Validated on Raw CNFs; Drift vs Collapse Distinguished
+
+**Context:** Follow-on from the 2026-06-10 diagnosis (daily radiation gaps = K-40 filter
+dropping spectra). Tested against raw 300 s CNFs the user pulled from Dropbox for four
+days: 2025-04-23 (the 2025 gain problem), 2026-05-13, 2026-06-08, 2026-06-10 (the day the
+detector was shut down for service).
+
+**Finding 1 — there are two distinct failure modes, and only one is recoverable:**
+- **Gain drift (2025-04-23):** photopeaks slide smoothly in channel space over the day
+  (slope wandered 0.66→0.735 keV/ch); total counts conserved. Recoverable by per-spectrum
+  recalibration.
+- **Collapse (2026-05-13 ~10:00–20:00 w/ recovery; 2026-06-10 from ~10:30):** response
+  above a few hundred keV drops out entirely; counts are lost, not relocated. NOT
+  recoverable in software — there is nothing to realign. 2026-06-08 shows a mild version:
+  +3.5% afternoon gain excursion with visibly degraded resolution (user spotted the
+  broadening on the waterfall) that didn't fully tip over.
+- Waterfall plots (time vs energy/channel, log-color) make the two modes visually
+  unmistakable and are worth productionizing for exactly that reason.
+
+**Finding 2 — the per-spectrum data is richer than assumed, but full of traps.** Things
+that broke naive approaches during validation, each now baked into the design:
+- The 2025 CNFs are **4096-channel**, 2026 CNFs 8192 — any fixed calibration assumption
+  is silently ~2x wrong across that boundary. The finder is calibration-agnostic and only
+  pins the slope to the channel-count-expected value (digitization fixes full scale).
+- Ranking candidate peaks by **height** lets wiggles on the tall low-energy continuum
+  crowd real photopeaks out of the pool; ranking by **prominence** fixes it.
+- **Tl-208 2614 is unusable in the fit** per-300s (tens of counts, noisy centroid,
+  longest lever arm — a bad centroid drags the slope hardest). It is confirm-only.
+- K-40 and Tl-208 are too weak per-300s to anchor identification (the committed v1
+  engine assumed otherwise and dropped all 159 real spectra it was tried on); the strong
+  per-300s lines are the radon daughters + K-40 found by prominence.
+- Independent per-spectrum fits still mis-assign ~10% of spectra (passed static gates,
+  ±15% off the track). Gain is physically continuous → a **temporal-consistency second
+  pass** discards impossible jumps and rescues refusals with a neighbor-centered band.
+
+**Change (`image_scripts/gain_stabilization.py`, rewritten):** pattern-based finder as
+described; `fit_collection_gains()` (production entry point, includes the temporal pass),
+`fit_spectrum_gain()`, count-conserving `correct_counts()`. scipy now required
+(environment.yml / requirements.txt updated) — server needs a one-time `conda install scipy`.
+
+**Validation (raw 300 s CNFs, via the repo module):**
+- 2025-04-23 drift day: **276/280 fit** (52 corrected/rescued by the temporal pass), the
+  daily gain track recovered as a smooth curve, corrected waterfall shows peaks straight
+  and vertical at their true energies.
+- 2026-06-08 stable day: **277/278 fit**, slope median 0.3325 IQR [0.3319, 0.3331] vs
+  nominal 0.3322 — correction is a no-op on stable data ("do no harm" check). The one
+  refusal is mid-excursion. The coefficient-vs-time plot *measured* the afternoon
+  excursion the user had spotted as resolution broadening — the technical gain-vs-time
+  plot works as an early-warning view.
+
+**Not done yet:** wiring into `raw_analysis.py` (correct-then-K40-filter, store gain in
+HDF5) and the production waterfall + gain-vs-time outputs in `h5_analysis.py`. See
+`docs/todo.md` "Detector gain drift" for the cut list.
+
 ### 2026-06-09: Server Froze Again (Silent, Non-SRSO); Add Watchdog + Health Logger
 
 **Problem:** The server hung again. Important: this is **not** an SRSO regression. The `spec_rstack_overflow=off` workaround from §7a *was* applied on the 2026-06-01 reboot (confirmed in `/proc/cmdline`) and it did its job — there are **no soft-lockup / `srso_return_thunk` entries** in the logs anymore. This was a *different*, silent freeze.
