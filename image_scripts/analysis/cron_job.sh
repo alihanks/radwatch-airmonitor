@@ -55,6 +55,15 @@ python3 /home/dosenet/radwatch-airmonitor/image_scripts/analysis/h5_analysis.py
 H5_EXIT=$?
 echo "h5_analysis.py exit code: $H5_EXIT"
 
+echo ""
+echo "--- waterfall_plots.py ---"
+# Last-24h spectral waterfall (data/waterfall_energy.png deploys with the other
+# PNGs) + channel/gain diagnostics and per-day archives in data/waterfalls/
+# (not deployed). Non-fatal: plots are additive to the core pipeline.
+python3 /home/dosenet/radwatch-airmonitor/image_scripts/analysis/waterfall_plots.py
+WFALL_EXIT=$?
+echo "waterfall_plots.py exit code: $WFALL_EXIT"
+
 # Check for generated output before proceeding
 echo ""
 if [ $RAW_EXIT -ne 0 ]; then

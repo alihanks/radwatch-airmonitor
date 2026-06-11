@@ -540,6 +540,34 @@ described; `fit_collection_gains()` (production entry point, includes the tempor
 HDF5) and the production waterfall + gain-vs-time outputs in `h5_analysis.py`. See
 `docs/todo.md` "Detector gain drift" for the cut list.
 
+### 2026-06-11: Production Waterfall + Gain-Trend Plots (`waterfall_plots.py`)
+
+**Change:** New `image_scripts/analysis/waterfall_plots.py`, called from `cron_job.sh`
+after `h5_analysis.py` (non-fatal step). Reads the last 24 h of raw 300 s CNFs directly
+from the Dropbox year folders (`rebin.h5` only has hourly sums — too coarse) and writes:
+
+- `data/waterfall_energy.png` — energy-axis waterfall for the website (top-level
+  `data/*.png` is what cron stages for deploy, so it ships automatically).
+- `data/waterfalls/current_channel.png` + `current_gain_trend.png` — raw channel-space
+  waterfall and gain-ratio-vs-time diagnostics. The subfolder is NOT deployed.
+- `data/waterfalls/YYYY-MM-DD_*.png` — per-calendar-day archives of all three, written
+  once the first time the script runs after a day ends.
+
+**Gain policy ("stable unless proven otherwise," per design review):** the detector is
+supposed to be gain-stable, so per-spectrum fits are always run for *detection*, but a
+fitted calibration is *applied* only when |gain_ratio − 1| > 1% (stable-day fit noise is
+±0.3%; real shifts are 3–9%). Stable spectra and no-fit spectra plot at nominal — so
+stable data is never resampled by fit noise, and collapse-mode spectra show the collapse
+honestly instead of being "corrected."
+
+**Verified locally** against the real 2026-06-08 day (278 CNFs in a mock Dropbox layout):
+277/278 fits, exactly the 42 excursion spectra crossed the 1% threshold and got corrected,
+K-40 line straight through the excursion on the energy plot, gain-trend plot shows the
++3.6% afternoon bump with the ±1% band shaded. Empty-window edge case skips gracefully.
+
+**Server deploy:** pull, `conda install scipy` (one-time), then it runs on the next cron
+tick. The website needs the new `waterfall_energy.png` embedded wherever it should appear.
+
 ### 2026-06-09: Server Froze Again (Silent, Non-SRSO); Add Watchdog + Health Logger
 
 **Problem:** The server hung again. Important: this is **not** an SRSO regression. The `spec_rstack_overflow=off` workaround from §7a *was* applied on the 2026-06-01 reboot (confirmed in `/proc/cmdline`) and it did its job — there are **no soft-lockup / `srso_return_thunk` entries** in the logs anymore. This was a *different*, silent freeze.

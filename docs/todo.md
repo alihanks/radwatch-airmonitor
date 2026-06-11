@@ -49,12 +49,20 @@ Calibration correction is irrelevant to collapse; for collapse the software job 
 2. **TODO — wire into `raw_analysis.py`**: run `fit_collection_gains` on new raw spectra
    before the K-40 livetime step, `correct_counts` the recoverable ones, store the
    per-spectrum gain_ratio in `rebin.h5`, and only then apply the K-40 filter. Requires
-   scipy on the server (`conda install scipy` — now in environment.yml).
-3. **TODO — plots in `h5_analysis.py`**: corrected waterfall (website) + gain_ratio /
-   calibration-coefficients vs time (technical, not website; prototyped 2026-06-11).
-   A high-energy-integral health metric should accompany them to flag collapse mode,
-   plus peak-width (resolution) tracking — degraded resolution preceded the 06-08
-   excursion and may be the earliest warning.
+   scipy on the server (`conda install scipy` — now in environment.yml). Apply the same
+   "stable unless proven otherwise" policy as the waterfalls: only correct spectra whose
+   fitted gain deviates >1% from nominal.
+3. **DONE — waterfall + gain-trend plots** (`image_scripts/analysis/waterfall_plots.py`,
+   run from cron after h5_analysis): last-24h energy waterfall (`data/waterfall_energy.png`,
+   deploys to the website with the other PNGs) + channel-space waterfall and gain-vs-time
+   diagnostics in `data/waterfalls/` (NOT deployed), with per-calendar-day archives written
+   there once each day completes. Gain policy: fits are always run for detection, but the
+   energy axis only uses a fitted calibration when |gain_ratio−1| > 1% — stable data is
+   never resampled by fit noise, and collapse spectra plot at nominal so the collapse is
+   visible.
+4. **TODO — collapse/health metrics**: a high-energy-integral health metric to flag
+   collapse mode numerically, plus peak-width (resolution) tracking — degraded resolution
+   preceded the 06-08 excursion and may be the earliest warning.
 
 **Backfill:** recovery applies going forward automatically once wired in; the historical
 drift-era gaps need a one-time full rebuild (the RadWatch lead will run it).
